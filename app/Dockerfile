@@ -1,5 +1,5 @@
-FROM alpine:3.7
-RUN apk add --no-cache python3 py3-pip
-COPY requirements.txt /app/requirements.txt
-WORKDIR /app
-RUN pip3 install -r requirements.txt
+FROM python:3.11-alpine
+WORKDIR /home/app
+COPY . .
+RUN pip install -r app/requirements.txt
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
