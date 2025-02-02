@@ -23,6 +23,13 @@ document.getElementById('transportationType').addEventListener('change', functio
 document.getElementById('tripForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
+    // Validate transportation type
+    const transportationType = document.getElementById('transportationType').value;
+    if (transportationType === 'empty') {
+        showError('Please select a transportation type');
+        return;
+    }
+    
     // Show loading state
     showLoading();
     
@@ -30,7 +37,7 @@ document.getElementById('tripForm').addEventListener('submit', async function(e)
     const formData = {
         origin: document.getElementById('origin').value,
         destination: document.getElementById('destination').value,
-        transportation_type: document.getElementById('transportationType').value,
+        transportation_type: transportationType,
         passengers: parseInt(document.getElementById('passengers').value),
         budget: {
             min_amount: parseFloat(document.getElementById('minBudget').value),
