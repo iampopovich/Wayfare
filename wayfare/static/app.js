@@ -235,35 +235,70 @@ function displayStopsDetails(route) {
     console.log('Displaying stops details:', route);
     const container = document.getElementById('stopsDetails');
     
-    // Get all refueling stops from segments
-    const refuelingStops = route.segments
-        .filter(segment => segment.refueling_stop)
-        .map(segment => segment.refueling_stop);
+    // Get all stops from the route data
+    const allStops = [];
     
-    console.log('Found refueling stops:', refuelingStops);
+    // Add refueling stops from segments
+    route.segments.forEach(segment => {
+        if (segment.refueling_stop) {
+            allStops.push({
+                ...segment.refueling_stop,
+                type: 'refueling'
+            });
+        }
+    });
+    
+    // Add other types of stops if they exist in route.stops
+    if (route.stops && route.stops.length > 0) {
+        allStops.push(...route.stops);
+    }
+    
+    console.log('Found all stops:', allStops);
 
-    if (!refuelingStops || refuelingStops.length === 0) {
-        container.innerHTML = '<p>No refueling stops required for this journey.</p>';
+    if (allStops.length === 0) {
+        container.innerHTML = '<p>No stops planned for this journey.</p>';
         return;
     }
 
+    // Group stops by type
+    const stopsByType = allStops.reduce((acc, stop) => {
+        const type = stop.type || 'other';
+        if (!acc[type]) acc[type] = [];
+        acc[type].push(stop);
+        return acc;
+    }, {});
+
     container.innerHTML = `
         <div class="result-card">
-            <h5 class="result-title">Refueling Stops</h5>
-            ${refuelingStops.map((stop, index) => `
-                <div class="stop-card mb-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h6>Refueling Stop ${index + 1}</h6>
-                            <p class="mb-1">Location: ${stop.location.address || 'Unknown location'}</p>
-                            <p class="mb-1">Distance: ${formatDistance(stop.distance_from_start)}</p>
-                            <p class="mb-1">Fuel level on arrival: ${stop.fuel_level_before.toFixed(1)}L</p>
-                            <p class="mb-1">Refuel amount: ${stop.fuel_needed.toFixed(1)}L</p>
-                            ${stop.estimated_cost ? `
-                                <p class="mb-1">Estimated cost: ${formatCurrency(stop.estimated_cost.amount, stop.estimated_cost.currency)}</p>
-                            ` : ''}
+            ${Object.entries(stopsByType).map(([type, stops]) => `
+                <div class="mb-4">
+                    <h5 class="result-title">${type.charAt(0).toUpperCase() + type.slice(1)} Stops</h5>
+                    ${stops.map((stop, index) => `
+                        <div class="stop-card mb-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6>${type.charAt(0).toUpperCase() + type.slice(1)} Stop ${index + 1}</h6>
+                                    <p class="mb-1">Location: ${stop.location.address || 'Unknown location'}</p>
+                                    ${stop.distance_from_start ? `
+                                        <p class="mb-1">Distance: ${formatDistance(stop.distance_from_start)}</p>
+                                    ` : ''}
+                                    ${stop.duration ? `
+                                        <p class="mb-1">Duration: ${formatDuration(stop.duration)}</p>
+                                    ` : ''}
+                                    ${stop.facilities && stop.facilities.length > 0 ? `
+                                        <p class="mb-1">Facilities: ${stop.facilities.join(', ')}</p>
+                                    ` : ''}
+                                    ${stop.type === 'refueling' ? `
+                                        <p class="mb-1">Fuel level on arrival: ${stop.fuel_level_before.toFixed(1)}L</p>
+                                        <p class="mb-1">Refuel amount: ${stop.fuel_needed.toFixed(1)}L</p>
+                                        ${stop.estimated_cost ? `
+                                            <p class="mb-1">Estimated cost: ${formatCurrency(stop.estimated_cost.amount, stop.estimated_cost.currency)}</p>
+                                        ` : ''}
+                                    ` : ''}
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    `).join('')}
                 </div>
             `).join('')}
         </div>
@@ -272,14 +307,21 @@ function displayStopsDetails(route) {
 
 function createStopPopup(stop) {
     let content = `<div class="stop-popup">
-        <h6>Refueling Stop</h6>
-        <p class="mb-1">Location: ${stop.location.address || 'Unknown location'}</p>
-        <p class="mb-1">Distance: ${formatDistance(stop.distance_from_start)}</p>
-        <p class="mb-1">Fuel level on arrival: ${stop.fuel_level_before.toFixed(1)}L</p>
-        <p class="mb-1">Refuel amount: ${stop.fuel_needed.toFixed(1)}L</p>`;
+        <h6>${stop.name || 'Stop'}</h6>
+        <p class="mb-1">Distance: ${formatDistance(stop.distance_from_start)}</p>`;
 
-    if (stop.estimated_cost) {
-        content += `<p class="mb-1">Estimated cost: ${formatCurrency(stop.estimated_cost.amount, stop.estimated_cost.currency)}</p>`;
+    if (stop.fuel_needed > 0) {
+        content += `
+            <p class="mb-1">Fuel level on arrival: ${stop.fuel_level_before.toFixed(1)}L</p>
+            <p class="mb-1">Refuel amount: ${stop.fuel_needed.toFixed(1)}L</p>`;
+    }
+
+    if (stop.rest_time_needed) {
+        content += `<p class="mb-1">Rest time: ${stop.rest_time_needed} minutes</p>`;
+    }
+
+    if (stop.facilities && stop.facilities.length > 0) {
+        content += `<p class="mb-0"><small>Facilities: ${stop.facilities.join(', ')}</small></p>`;
     }
 
     content += '</div>';
@@ -339,14 +381,40 @@ function displayAccommodationDetails(accommodation) {
 
 function displayCostDetails(costs) {
     const container = document.getElementById('costsDetails');
+    console.log('Displaying cost details:', costs);
     
-    // Create cost items array from available costs
-    const costItems = [];
-    if (costs.fuel_cost) costItems.push(['Fuel', costs.fuel_cost]);
-    if (costs.ticket_cost) costItems.push(['Tickets', costs.ticket_cost]);
-    if (costs.food_cost) costItems.push(['Food', costs.food_cost]);
-    if (costs.water_cost) costItems.push(['Water', costs.water_cost]);
-    if (costs.accommodation_cost) costItems.push(['Accommodation', costs.accommodation_cost]);
+    // Define all possible cost types with their display names
+    const costTypes = {
+        fuel_cost: 'Fuel',
+        ticket_cost: 'Tickets',
+        food_cost: 'Food',
+        water_cost: 'Water',
+        accommodation_cost: 'Accommodation',
+        toll_cost: 'Road Tolls',
+        parking_cost: 'Parking',
+        maintenance_cost: 'Vehicle Maintenance',
+        rest_stop_cost: 'Rest Stops',
+        other_cost: 'Other Expenses'
+    };
+
+    // Create cost items array from all available costs
+    const costItems = Object.entries(costs)
+        .filter(([key, value]) => 
+            key in costTypes && // Only include known cost types
+            value !== null && 
+            value !== undefined && 
+            value !== 0 && 
+            key !== 'total_cost' && // Exclude total cost as it's shown separately
+            key !== 'currency' // Exclude currency as it's not a cost
+        )
+        .map(([key, value]) => ({
+            category: costTypes[key],
+            amount: value,
+            key: key
+        }));
+
+    // Sort cost items by amount (highest first)
+    costItems.sort((a, b) => b.amount - a.amount);
 
     // Additional details for car travel
     const carDetails = [];
@@ -368,16 +436,30 @@ function displayCostDetails(costs) {
         );
     }
 
+    // Calculate the sum of all individual costs
+    const sumOfCosts = costItems.reduce((sum, item) => sum + item.amount, 0);
+    const totalCost = costs.total_cost || sumOfCosts;
+
+    // Check if there's a difference between total and sum of items
+    const unexplainedCosts = totalCost - sumOfCosts;
+
     container.innerHTML = `
         <div class="result-card">
             <h5 class="result-title">Cost Breakdown</h5>
             <div class="cost-breakdown">
-                ${costItems.map(([category, amount]) => `
+                ${costItems.map(item => `
                     <div class="cost-item">
-                        <span class="cost-label">${category}</span>
-                        <span class="cost-value">${formatCurrency(amount, costs.currency)}</span>
+                        <span class="cost-label">${item.category}</span>
+                        <span class="cost-value">${formatCurrency(item.amount, costs.currency)}</span>
                     </div>
                 `).join('')}
+                ${unexplainedCosts > 0 ? `
+                    <div class="cost-item text-warning">
+                        <span class="cost-label">Additional Costs</span>
+                        <span class="cost-value">${formatCurrency(unexplainedCosts, costs.currency)}</span>
+                        <small class="d-block text-muted">These costs may include service fees, taxes, or other miscellaneous expenses</small>
+                    </div>
+                ` : ''}
             </div>
             ${carDetails.length > 0 ? `
                 <div class="car-details mt-3">
@@ -388,7 +470,7 @@ function displayCostDetails(costs) {
             <div class="mt-3">
                 <h6>Total Cost</h6>
                 <div class="cost-item total-cost">
-                    <span class="cost-value">${formatCurrency(costs.total_cost, costs.currency)}</span>
+                    <span class="cost-value">${formatCurrency(totalCost, costs.currency)}</span>
                 </div>
             </div>
         </div>
