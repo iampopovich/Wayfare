@@ -8,8 +8,14 @@ class CarSpecifications(BaseModel):
     fuel_consumption: float = Field(default=11.0, description="Fuel consumption in liters per 100km")
     fuel_type: str = Field(default="gasoline", description="Type of fuel (e.g., gasoline, diesel)")
     tank_capacity: float = Field(default=50.0, description="Fuel tank capacity in liters")
+    initial_fuel: float = Field(default=50.0, description="Current fuel level in liters")
     base_mass: float = Field(default=1200.0, description="Base vehicle mass in kg")
     passenger_mass: float = Field(default=75.0, description="Standard passenger mass in kg")
+
+    @property
+    def fuel_level_percentage(self) -> float:
+        """Calculate current fuel level as percentage of tank capacity"""
+        return (self.initial_fuel / self.tank_capacity) * 100 if self.tank_capacity > 0 else 0
 
     class Config:
         json_schema_extra = {
@@ -19,6 +25,7 @@ class CarSpecifications(BaseModel):
                 "fuel_consumption": 11.0,
                 "fuel_type": "gasoline",
                 "tank_capacity": 50.0,
+                "initial_fuel": 25.0,
                 "base_mass": 1200.0,
                 "passenger_mass": 75.0
             }

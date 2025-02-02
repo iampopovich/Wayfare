@@ -7,9 +7,37 @@ Wayfare is an intelligent travel planning tool that helps you **discover destina
 ---
 
 ## 🚀 **Features**
+✅ **Multi-Modal Transportation** 
+- Support for car, bus, train, and walking
+- Intelligent route optimization
+- Automatic refueling stop calculations for car journeys
+- Mass-aware fuel consumption calculations
+
+✅ **Cost Analysis**
+- Detailed cost breakdown for each journey
+- Fuel costs calculation based on current prices
+- Food and accommodation costs for long trips
+- Ticket prices for public transport
+
+✅ **Interactive Maps**
+- Real-time route visualization
+- Stop and waypoint display
+- One-click sharing to Google Maps
+- Distance and duration calculations
+
+✅ **Vehicle Specifications**
+- Customizable car parameters
+- Fuel consumption calculations
+- Mass-based efficiency adjustments
+- Tank capacity and range estimation
+
+✅ **Health Impact**
+- Calorie burn estimates
+- Activity breakdown
+- Health benefits tracking
+
 ✅ **AI-Assisted Planning** – Get smart travel suggestions tailored to your preferences.  
 ✅ **Dynamic Itinerary Management** – Modify your trips in real-time with AI-powered updates.  
-✅ **Interactive Maps Integration** – Visualize and optimize your travel routes via Google Maps API.  
 ✅ **Personalized Travel Companion** – Save favorite places, manage bookings, and organize activities.  
 ✅ **Seamless Collaboration** – Share and edit itineraries with friends and family.  
 ✅ **Memory & Context Awareness** – AI remembers past interactions for a more personalized experience.  
@@ -17,11 +45,11 @@ Wayfare is an intelligent travel planning tool that helps you **discover destina
 ---
 
 ## 🎯 **Tech Stack**
-- **Frontend:** React (Next.js), TailwindCSS  
-- **Backend:** FastAPI, Python  
+- **Frontend:** JavaScript (Vanilla), Bootstrap 5, Leaflet.js, Font Awesome  
+- **Backend:** Python, FastAPI, Pydantic, SQLAlchemy  
 - **AI Frameworks:** LangChain, LangGraph, CopilotKit  
 - **Databases:** PostgreSQL, Redis  
-- **APIs:** OpenAI API, Google Maps API, Pinecone  
+- **APIs:** OpenStreetMap, Google Maps API, Pinecone  
 
 ---
 
@@ -37,6 +65,7 @@ Create an `.env` file and add your API keys:
 ```bash
 OPENAI_API_KEY=<your_openai_api_key>
 GOOGLE_MAPS_API_KEY=<your_google_maps_api_key>
+WEATHER_API_KEY=<your_weather_api_key>
 ```
 
 ### **3️⃣ Install dependencies**

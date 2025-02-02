@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Tuple
 import polyline
 from wayfare.models.travel import TravelRequest, TravelResponse, TransportationType
 from wayfare.models.route import Route, RouteSegment
@@ -6,9 +6,12 @@ from wayfare.models.location import Location
 from wayfare.models.stops import Stop
 from wayfare.models.costs import Cost
 from wayfare.models.health import Health
-from wayfare.models.vehicle import TransportCosts
+from wayfare.models.vehicle import TransportCosts, CarSpecifications
 from wayfare.repositories.maps.google_maps import GoogleMapsRepository
 import logging
+import aiohttp
+import asyncio
+from math import ceil
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +120,168 @@ class TravelService:
             
         return costs
 
+    async def _find_gas_stations_along_route(
+        self,
+        route_points: List[Tuple[float, float]],
+        search_radius_meters: int = 5000
+    ) -> List[dict]:
+        """Find gas stations near route points using OpenStreetMap Overpass API."""
+        gas_stations = []
+        
+        async with aiohttp.ClientSession() as session:
+            for lat, lon in route_points:
+                # Overpass query to find gas stations within radius
+                query = f"""
+                [out:json][timeout:25];
+                (
+                  node["amenity"="fuel"](around:{search_radius_meters},{lat},{lon});
+                  way["amenity"="fuel"](around:{search_radius_meters},{lat},{lon});
+                  relation["amenity"="fuel"](around:{search_radius_meters},{lat},{lon});
+                );
+                out center;
+                """
+                
+                try:
+                    async with session.post('https://overpass-api.de/api/interpreter', data=query) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            for element in data.get('elements', []):
+                                # Get coordinates based on element type
+                                if element['type'] == 'node':
+                                    station_lat, station_lon = element['lat'], element['lon']
+                                else:  # way or relation
+                                    station_lat = element['center']['lat']
+                                    station_lon = element['center']['lon']
+                                
+                                gas_stations.append({
+                                    'location': {'latitude': station_lat, 'longitude': station_lon},
+                                    'name': element.get('tags', {}).get('name', 'Gas Station'),
+                                    'brand': element.get('tags', {}).get('brand', 'Unknown'),
+                                    'amenities': ['fuel', 'rest_stop']
+                                })
+                except Exception as e:
+                    print(f"Error fetching gas stations: {e}")
+                
+                # Rate limiting to be nice to the API
+                await asyncio.sleep(1)
+        
+        return gas_stations
+
+    async def _calculate_optimal_stops(
+        self,
+        route_segments: List[RouteSegment],
+        car_specs: CarSpecifications,
+        total_distance_km: float,
+        gas_stations: List[dict],
+        request: TravelRequest
+    ) -> List[dict]:
+        """Calculate optimal stops based on fuel range, rest requirements, and current fuel level."""
+        stops = []
+        
+        # Calculate vehicle range with current load
+        total_mass = car_specs.base_mass + (car_specs.passenger_mass * request.passengers)
+        mass_factor = 1 + ((total_mass - car_specs.base_mass) / 100) * 0.01
+        adjusted_consumption = car_specs.fuel_consumption * mass_factor
+        
+        # Calculate range with current fuel level
+        current_range_km = (car_specs.initial_fuel / adjusted_consumption) * 100
+        full_tank_range_km = (car_specs.tank_capacity / adjusted_consumption) * 100
+        
+        # Maximum driving time before rest (4 hours)
+        MAX_DRIVING_TIME_MINUTES = 240
+        FUEL_RESERVE_PERCENTAGE = 15  # Don't let tank go below 15%
+        
+        # Calculate when we need the first refuel
+        first_refuel_distance = current_range_km * (1 - FUEL_RESERVE_PERCENTAGE/100)
+        
+        # Calculate required stops
+        remaining_distance = total_distance_km - first_refuel_distance
+        if remaining_distance > 0:
+            additional_refuel_stops = ceil(remaining_distance / (full_tank_range_km * (1 - FUEL_RESERVE_PERCENTAGE/100)))
+        else:
+            additional_refuel_stops = 0
+        
+        num_refuel_stops = additional_refuel_stops + (1 if first_refuel_distance < total_distance_km else 0)
+        
+        # Calculate rest stops needed
+        total_duration_minutes = sum(segment.duration for segment in route_segments)
+        num_rest_stops = ceil(total_duration_minutes / MAX_DRIVING_TIME_MINUTES)
+        
+        # Take the maximum of refuel and rest stops needed
+        num_total_stops = max(num_refuel_stops, num_rest_stops)
+        
+        if num_total_stops > 0:
+            current_distance = 0
+            current_fuel = car_specs.initial_fuel
+            time_since_rest = 0
+            last_rest_distance = 0
+            
+            for segment in route_segments:
+                segment_distance = segment.distance / 1000  # Convert to km
+                segment_time = segment.duration
+                
+                # Calculate fuel consumption for this segment
+                segment_consumption = (segment_distance / 100) * adjusted_consumption
+                
+                # Check points along the segment
+                check_points = [(d, segment_distance * (d/10)) for d in range(1, 11)]
+                
+                for progress, distance_in_segment in check_points:
+                    point_distance = current_distance + distance_in_segment
+                    point_time = time_since_rest + (segment_time * (progress/10))
+                    current_fuel -= segment_consumption * (progress/10)
+                    
+                    needs_fuel = current_fuel / car_specs.tank_capacity < (FUEL_RESERVE_PERCENTAGE/100)
+                    needs_rest = point_time >= MAX_DRIVING_TIME_MINUTES
+                    
+                    if needs_fuel or needs_rest:
+                        # Find the closest gas station to this point
+                        point_lat = segment.start_location.latitude + (segment.end_location.latitude - segment.start_location.latitude) * (progress/10)
+                        point_lon = segment.start_location.longitude + (segment.end_location.longitude - segment.start_location.longitude) * (progress/10)
+                        
+                        # Find nearest station
+                        nearest_station = min(
+                            gas_stations,
+                            key=lambda s: (
+                                (s['location']['latitude'] - point_lat) ** 2 +
+                                (s['location']['longitude'] - point_lon) ** 2
+                            )
+                        )
+                        
+                        # Calculate cumulative time to this point
+                        cumulative_time = 0
+                        for s in route_segments[:route_segments.index(segment)]:
+                            cumulative_time += s.duration
+                        cumulative_time += segment.duration * (progress/10)
+                        
+                        stop_type = []
+                        if needs_fuel:
+                            stop_type.append('refuel')
+                            current_fuel = car_specs.tank_capacity  # Refuel to full
+                        if needs_rest:
+                            stop_type.append('rest')
+                            time_since_rest = 0
+                            last_rest_distance = point_distance
+                        
+                        stops.append({
+                            'location': nearest_station['location'],
+                            'name': nearest_station.get('name', f'Stop {len(stops) + 1}'),
+                            'brand': nearest_station.get('brand', ''),
+                            'estimated_arrival_time': int(cumulative_time),  # Convert to integer minutes
+                            'distance_from_start': round(point_distance, 1),  # Round to 1 decimal
+                            'facilities': nearest_station.get('amenities', ['fuel', 'rest_stop']),
+                            'type': ' and '.join(stop_type),  # Use space instead of underscore
+                            'duration': 30 if needs_rest else 15,  # 30 min for rest stops, 15 min for fuel stops
+                            'fuel_level_before': round(current_fuel, 1),
+                            'fuel_needed': round(car_specs.tank_capacity - current_fuel, 1) if needs_fuel else 0,
+                            'rest_time_needed': 30 if needs_rest else 0
+                        })
+                
+                current_distance += segment_distance
+                time_since_rest += segment_time
+        
+        return stops
+
     async def plan_travel(self, request: TravelRequest) -> TravelResponse:
         """Plan a travel route with all necessary details using Google Maps."""
         try:
@@ -139,29 +304,48 @@ class TravelService:
                 mode=mode
             )
 
+            # Extract route points for gas station search
+            route_points = []
+            total_distance_km = 0
+            
+            for segment in route.segments:
+                route_points.append((
+                    segment.start_location.latitude,
+                    segment.start_location.longitude
+                ))
+                total_distance_km += segment.distance / 1000  # Convert meters to km
+            
+            # Add final destination
+            if route.segments:
+                route_points.append((
+                    route.segments[-1].end_location.latitude,
+                    route.segments[-1].end_location.longitude
+                ))
+            
+            # Find gas stations along route
+            gas_stations = await self._find_gas_stations_along_route(route_points)
+            
+            # Temporarily disable stop calculations
+            stops = []
+            
             # Calculate transport costs
             costs = await self._calculate_transport_costs(
-                distance_meters=route.total_distance,
-                duration_minutes=route.total_duration,
-                transport_type=request.transportation_type,
-                request=request
+                sum(segment.distance for segment in route.segments),
+                sum(segment.duration for segment in route.segments),
+                request.transportation_type,
+                request
             )
 
             # Calculate health metrics
             health = Health(
                 total_calories=self._calculate_calories(
-                    route.total_distance,
+                    sum(segment.distance for segment in route.segments),
                     request.transportation_type
                 ),
                 activity_breakdown={
-                    request.transportation_type.value: route.total_distance * 0.1
+                    request.transportation_type.value: sum(segment.distance for segment in route.segments) * 0.1
                 }
             )
-
-            # Find stops along the route if needed
-            stops = []
-            if route.total_duration > 120:  # If journey is more than 2 hours
-                stops = await self._find_stops(route, request)
 
             return TravelResponse(
                 route=route,
@@ -173,46 +357,6 @@ class TravelService:
         except Exception as e:
             logger.error(f"Error in plan_travel: {str(e)}", exc_info=True)
             raise ValueError(f"Failed to plan travel: {str(e)}")
-
-    async def _find_stops(self, route: Route, request: TravelRequest) -> List[Stop]:
-        """Find suitable stops along the route."""
-        stops = []
-        try:
-            # Calculate number of stops needed
-            hours = route.total_duration / 60
-            num_stops = max(1, int(hours / 2))  # One stop every 2 hours
-
-            for i in range(num_stops):
-                # Get a point along the route
-                segment = route.segments[int(len(route.segments) * (i + 1) / (num_stops + 1))]
-                
-                # Search for places near this point
-                places = await self.maps_repository.search_places(
-                    query="restaurant OR rest area OR gas station",
-                    location=segment.start_location,
-                    radius=5000  # 5km radius
-                )
-
-                if places:
-                    # Take the first suitable place
-                    place = places[0]
-                    stops.append(Stop(
-                        location=Location(
-                            latitude=place["geometry"]["location"]["lat"],
-                            longitude=place["geometry"]["location"]["lng"],
-                            address=place.get("formatted_address", ""),
-                            place_id=place["place_id"]
-                        ),
-                        type="rest",
-                        duration=30,  # 30 minutes stop
-                        facilities=place.get("types", [])
-                    ))
-
-        except Exception as e:
-            logger.warning(f"Error finding stops: {str(e)}", exc_info=True)
-            # Continue without stops if there's an error
-
-        return stops
 
     def _calculate_calories(self, distance_meters: float, transport_type: TransportationType) -> float:
         """Calculate calories burned during travel."""

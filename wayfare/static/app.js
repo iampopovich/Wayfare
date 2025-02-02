@@ -7,6 +7,9 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 let routeLayer = null;
 let markersLayer = null;
 
+// Store the current route data globally
+let currentRouteData = null;
+
 // Form handling
 document.getElementById('transportationType').addEventListener('change', function(e) {
     const carDetails = document.getElementById('carDetails');
@@ -41,13 +44,15 @@ document.getElementById('tripForm').addEventListener('submit', async function(e)
 
     // Add car specifications if transport type is car
     if (formData.transportation_type === 'car') {
-        const carModel = document.getElementById('carModel').value;
         formData.car_specifications = {
-            model: carModel || 'Standard 1.6L',
-            engine_volume: 1.6,
-            fuel_consumption: 11.0,
-            fuel_type: 'gasoline',
-            tank_capacity: 50.0
+            model: document.getElementById('carModel').value || 'Standard 1.6L',
+            engine_volume: parseFloat(document.getElementById('engineVolume').value) || 1.6,
+            fuel_consumption: parseFloat(document.getElementById('fuelConsumption').value) || 11.0,
+            fuel_type: document.getElementById('fuelType').value || 'gasoline',
+            tank_capacity: parseFloat(document.getElementById('tankCapacity').value) || 50.0,
+            initial_fuel: parseFloat(document.getElementById('initialFuel').value) || 25.0,
+            base_mass: 1200.0,
+            passenger_mass: 75.0
         };
     }
 
@@ -77,6 +82,9 @@ document.getElementById('tripForm').addEventListener('submit', async function(e)
 });
 
 function displayResults(data) {
+    // Store the route data globally
+    currentRouteData = data;
+    
     // Clear previous results
     clearMap();
     
@@ -96,7 +104,59 @@ function displayResults(data) {
     
     // Update health tab
     displayHealthDetails(data.health);
+    
+    // Show share button
+    document.getElementById('shareRouteButton').classList.remove('d-none');
 }
+
+function shareRoute() {
+    if (!currentRouteData) {
+        showError('No route available to share');
+        return;
+    }
+
+    const { route, stops } = currentRouteData;
+    
+    // Start with origin
+    const firstSegment = route.segments[0];
+    let waypoints = [`${firstSegment.start_location.latitude},${firstSegment.start_location.longitude}`];
+    
+    // Add stops as waypoints
+    if (stops && stops.length > 0) {
+        const stopWaypoints = stops.map(stop => 
+            `${stop.location.latitude},${stop.location.longitude}`
+        );
+        waypoints = waypoints.concat(stopWaypoints);
+    }
+    
+    // Add destination
+    const lastSegment = route.segments[route.segments.length - 1];
+    waypoints.push(`${lastSegment.end_location.latitude},${lastSegment.end_location.longitude}`);
+    
+    // Create Google Maps URL
+    const origin = waypoints.shift();
+    const destination = waypoints.pop();
+    const waypointsParam = waypoints.length > 0 
+        ? `&waypoints=${waypoints.join('|')}` 
+        : '';
+    
+    // Get travel mode
+    const travelMode = document.getElementById('transportationType').value;
+    const googleMapsMode = {
+        'car': 'driving',
+        'walking': 'walking',
+        'bicycle': 'bicycling',
+        'bus': 'transit',
+        'train': 'transit'
+    }[travelMode] || 'driving';
+    
+    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypointsParam}&travelmode=${googleMapsMode}`;
+    
+    // Open in new tab
+    window.open(googleMapsUrl, '_blank');
+}
+
+document.getElementById('shareRouteButton').addEventListener('click', shareRoute);
 
 function displayRoute(route) {
     clearMap();
@@ -180,26 +240,35 @@ function displayRouteDetails(route) {
 function displayStopsDetails(stops) {
     const container = document.getElementById('stopsDetails');
     if (!stops || stops.length === 0) {
-        container.innerHTML = `
-            <div class="result-card">
-                <h5 class="result-title">Planned Stops</h5>
-                <p>No stops planned for this route.</p>
-            </div>
-        `;
+        container.innerHTML = '<p>No stops required for this journey.</p>';
         return;
     }
 
     container.innerHTML = `
         <div class="result-card">
             <h5 class="result-title">Planned Stops</h5>
-            ${stops.map(stop => `
+            ${stops.map((stop, index) => `
                 <div class="stop-card mb-3">
-                    <h6>${stop.type} Stop</h6>
-                    <p class="mb-1"><small>Location: ${stop.location.address}</small></p>
-                    <p class="mb-1"><small>Duration: ${formatDuration(stop.duration)}</small></p>
-                    ${stop.facilities.length > 0 ? `
-                        <p class="mb-0"><small>Facilities: ${stop.facilities.join(', ')}</small></p>
-                    ` : ''}
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6>${stop.name || `Stop ${index + 1}`}</h6>
+                            <p class="mb-1">Distance: ${typeof stop.distance_from_start === 'number' ? stop.distance_from_start : 0}km from start</p>
+                            <p class="mb-1">Estimated arrival: ${typeof stop.estimated_arrival_time === 'number' ? formatDuration(stop.estimated_arrival_time) : '0h 0m'}</p>
+                            ${stop.fuel_level_before !== undefined ? `
+                                <p class="mb-1">Fuel level on arrival: ${typeof stop.fuel_level_before === 'number' ? stop.fuel_level_before : 0}L</p>
+                                ${stop.fuel_needed > 0 ? `
+                                    <p class="mb-1">Refuel needed: ${typeof stop.fuel_needed === 'number' ? stop.fuel_needed : 0}L</p>
+                                ` : ''}
+                            ` : ''}
+                            ${stop.rest_time_needed ? `
+                                <p class="mb-1">Rest duration: ${stop.rest_time_needed} minutes</p>
+                            ` : ''}
+                            <p class="mb-0"><small>Type: ${stop.type}</small></p>
+                            ${stop.facilities && stop.facilities.length > 0 ? `
+                                <p class="mb-0"><small>Facilities: ${stop.facilities.join(', ')}</small></p>
+                            ` : ''}
+                        </div>
+                    </div>
                 </div>
             `).join('')}
         </div>
@@ -301,8 +370,11 @@ function formatDistance(meters) {
 }
 
 function formatDuration(minutes) {
+    if (typeof minutes !== 'number' || isNaN(minutes)) {
+        return '0h 0m';
+    }
     const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
+    const mins = Math.floor(minutes % 60);
     return `${hours}h ${mins}m`;
 }
 

@@ -51,8 +51,37 @@
 
                                 <!-- Car Details (shown only when car is selected) -->
                                 <div id="carDetails" class="mb-3 d-none">
-                                    <label class="form-label">Car Model</label>
-                                    <input type="text" class="form-control" id="carModel" placeholder="e.g., Toyota Camry 2020">
+                                    <h6>Car Details</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="carModel" class="form-label">Car Model</label>
+                                            <input type="text" class="form-control" id="carModel" value="Standard 1.6L">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="engineVolume" class="form-label">Engine Volume (L)</label>
+                                            <input type="number" class="form-control" id="engineVolume" value="1.6" step="0.1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="fuelConsumption" class="form-label">Fuel Consumption (L/100km)</label>
+                                            <input type="number" class="form-control" id="fuelConsumption" value="11.0" step="0.1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="tankCapacity" class="form-label">Tank Capacity (L)</label>
+                                            <input type="number" class="form-control" id="tankCapacity" value="50.0" step="0.1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="initialFuel" class="form-label">Current Fuel Level (L)</label>
+                                            <input type="number" class="form-control" id="initialFuel" value="25.0" step="0.1" min="0">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="fuelType" class="form-label">Fuel Type</label>
+                                            <select class="form-select" id="fuelType">
+                                                <option value="gasoline">Gasoline</option>
+                                                <option value="diesel">Diesel</option>
+                                                <option value="electric">Electric</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Passengers -->
@@ -95,6 +124,12 @@
                     <!-- Map -->
                     <div class="card mb-3">
                         <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="card-title mb-0">Route Map</h5>
+                                <button id="shareRouteButton" class="btn btn-outline-primary d-none" onclick="shareRoute()">
+                                    <i class="bi bi-share"></i> Open in Google Maps
+                                </button>
+                            </div>
                             <div id="map" style="height: 400px;"></div>
                         </div>
                     </div>
