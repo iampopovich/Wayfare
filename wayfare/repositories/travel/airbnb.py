@@ -10,8 +10,8 @@ from langchain.tools import Tool
 from langchain.agents import AgentType, initialize_agent
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from wayfare.repositories.base import BaseAccommodationRepository
-from wayfare.models.base import GeoLocation, PlaceDetails, SearchResult, Accommodation, PriceRange
+from repositories.base import BaseAccommodationRepository
+from models.base import GeoLocation, PlaceDetails, SearchResult, Accommodation, PriceRange
 
 
 class AirbnbRepository(BaseAccommodationRepository):

@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from wayfare.agents.base import BaseAgent, AgentResponse
+from agents.base import BaseAgent, AgentResponse
 
 class CarSpecificationAgent(BaseAgent):
     def _setup_chain(self):

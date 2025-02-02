@@ -3,8 +3,8 @@ import aiohttp
 from langchain.tools import Tool
 from langchain.agents import AgentType, initialize_agent
 
-from wayfare.repositories.base import BaseMapsRepository
-from wayfare.models.base import GeoLocation, PlaceDetails, SearchResult
+from repositories.base import BaseMapsRepository
+from models.base import GeoLocation, PlaceDetails, SearchResult
 
 
 class MapsMeRepository(BaseMapsRepository):

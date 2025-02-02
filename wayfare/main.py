@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 import logging
 import time
-from wayfare.core.logging import setup_logging
+from core.logging import setup_logging
 import uvicorn
 from fastapi.exceptions import HTTPException
 
@@ -17,8 +17,8 @@ load_dotenv()
 setup_logging()
 logger = logging.getLogger(__name__)
 
-from wayfare.api.dependencies import get_maps_service, get_travel_service
-from wayfare.api.v1 import maps, travel
+from api.dependencies import get_maps_service, get_travel_service
+from api.v1 import maps, travel
 
 app = FastAPI(title="Wayfare API", version="1.0.0")
 
@@ -64,7 +64,7 @@ async def log_requests(request: Request, call_next):
         )
 
 # Mount static files
-app.mount("/static", StaticFiles(directory="wayfare/static"), name="static")
+app.mount("/static", StaticFiles(directory="./static"), name="static")
 
 # Include routers
 app.include_router(maps.router, prefix="/api/v1/maps", tags=["maps"])
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     
     # Run the server
     uvicorn.run(
-        "wayfare.main:app",
+        "main:app",
         host="0.0.0.0",  # Required for Render
         port=port,
         reload=True

@@ -1,13 +1,13 @@
 from typing import List, Tuple
 import polyline
-from wayfare.models.travel import TravelRequest, TravelResponse, TransportationType
-from wayfare.models.route import Route, RouteSegment
-from wayfare.models.location import Location
-from wayfare.models.stops import Stop
-from wayfare.models.costs import Cost
-from wayfare.models.health import Health
-from wayfare.models.vehicle import TransportCosts, CarSpecifications
-from wayfare.repositories.maps.google_maps import GoogleMapsRepository
+from models.travel import TravelRequest, TravelResponse, TransportationType
+from models.route import Route, RouteSegment
+from models.location import Location
+from models.stops import Stop
+from models.costs import Cost
+from models.health import Health
+from models.vehicle import TransportCosts, CarSpecifications
+from repositories.maps.google_maps import GoogleMapsRepository
 import logging
 import aiohttp
 import asyncio

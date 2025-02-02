@@ -4,7 +4,7 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 
-from wayfare.models.base import GeoLocation, PlaceDetails, SearchResult
+from models.base import GeoLocation, PlaceDetails, SearchResult
 
 
 class BaseRepository(ABC):

@@ -5,8 +5,8 @@ from fake_useragent import UserAgent
 from langchain.tools import Tool
 from langchain.agents import AgentType, initialize_agent
 
-from wayfare.repositories.base import BaseAccommodationRepository
-from wayfare.models.base import GeoLocation, PlaceDetails, SearchResult, Accommodation
+from repositories.base import BaseAccommodationRepository
+from models.base import GeoLocation, PlaceDetails, SearchResult, Accommodation
 
 
 class BookingRepository(BaseAccommodationRepository):

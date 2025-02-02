@@ -1,6 +1,6 @@
 from typing import List, Optional, Any
 from pydantic import BaseModel, Field
-from wayfare.models.location import Location
+from models.location import Location
 
 class Stop(BaseModel):
     location: Location

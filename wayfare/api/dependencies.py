@@ -1,10 +1,10 @@
 from functools import lru_cache
 from fastapi import Depends
 
-from wayfare.config import get_settings
-from wayfare.services.travel import TravelService
-from wayfare.services.maps import MapsService
-from wayfare.repositories.maps.google_maps import GoogleMapsRepository
+from config import get_settings
+from services.travel import TravelService
+from services.maps import MapsService
+from repositories.maps.google_maps import GoogleMapsRepository
 
 # Load environment variables
 # load_dotenv()

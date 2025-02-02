@@ -1,8 +1,8 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
-from wayfare.services.maps import MapsService
-from wayfare.api.dependencies import get_maps_service
-from wayfare.models.location import Location
+from services.maps import MapsService
+from api.dependencies import get_maps_service
+from models.location import Location
 
 router = APIRouter()
 

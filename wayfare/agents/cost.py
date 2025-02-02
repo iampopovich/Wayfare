@@ -1,5 +1,5 @@
 from typing import Dict, Any, List, Optional
-from wayfare.agents.base import BaseAgent, AgentResponse
+from agents.base import BaseAgent, AgentResponse
 
 class TotalCostAgent(BaseAgent):
     def _setup_chain(self):

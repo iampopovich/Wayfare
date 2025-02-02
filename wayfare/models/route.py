@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
-from wayfare.models.location import Location
+from models.location import Location
 
 class RouteSegment(BaseModel):
     start_location: Location

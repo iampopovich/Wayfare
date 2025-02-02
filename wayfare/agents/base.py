@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
-from wayfare.core.settings import settings
+from core.settings import settings
 
 class BaseAgent(ABC):
     def __init__(self, model_name: Optional[str] = None):
@@ -58,16 +58,16 @@ class AgentCoordinator:
 
     def _register_agents(self):
         """Register all available agents."""
-        from wayfare.agents.route import RouteAgent
-        from wayfare.agents.accommodation import AccommodationAgent
-        from wayfare.agents.fuel import (
+        from agents.route import RouteAgent
+        from agents.accommodation import AccommodationAgent
+        from agents.fuel import (
             FuelStationAgent, CarSpecificationAgent,
             FuelConsumptionAgent, FuelPriceAgent
         )
-        from wayfare.agents.cost import TotalCostAgent
-        from wayfare.agents.health import CaloriesAgent
-        from wayfare.agents.stops import StopsAgent
-        from wayfare.agents.food import FoodCostAgent
+        from agents.cost import TotalCostAgent
+        from agents.health import CaloriesAgent
+        from agents.stops import StopsAgent
+        from agents.food import FoodCostAgent
 
         self.agents = {
             "route": RouteAgent(),

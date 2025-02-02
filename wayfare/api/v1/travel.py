@@ -1,8 +1,8 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends
-from wayfare.services.travel import TravelService
-from wayfare.api.dependencies import get_travel_service
-from wayfare.models.travel import TravelRequest, TravelResponse
+from services.travel import TravelService
+from api.dependencies import get_travel_service
+from models.travel import TravelRequest, TravelResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

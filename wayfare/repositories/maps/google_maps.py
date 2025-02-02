@@ -1,9 +1,9 @@
 from typing import Optional, List, Dict, Any
 import googlemaps
 import polyline
-from wayfare.models.base import GeoLocation, PlaceDetails, SearchResult
-from wayfare.models.location import Location
-from wayfare.models.route import Route, RouteSegment
+from models.base import GeoLocation, PlaceDetails, SearchResult
+from models.location import Location
+from models.route import Route, RouteSegment
 import logging
 
 logger = logging.getLogger(__name__)

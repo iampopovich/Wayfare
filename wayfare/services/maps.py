@@ -3,11 +3,11 @@ import asyncio
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
-from wayfare.services.base import BaseService
-from wayfare.models.base import GeoLocation, PlaceDetails, SearchResult
-from wayfare.repositories.maps.google_maps import GoogleMapsRepository
-from wayfare.repositories.maps.osm import OSMRepository
-from wayfare.repositories.maps.mapsme import MapsMeRepository
+from services.base import BaseService
+from models.base import GeoLocation, PlaceDetails, SearchResult
+from repositories.maps.google_maps import GoogleMapsRepository
+from repositories.maps.osm import OSMRepository
+from repositories.maps.mapsme import MapsMeRepository
 
 
 class MapsService(BaseService):

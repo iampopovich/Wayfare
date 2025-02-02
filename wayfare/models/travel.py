@@ -1,12 +1,12 @@
 from typing import List, Optional
 from enum import Enum
 from pydantic import BaseModel, Field, validator
-from wayfare.models.location import Location
-from wayfare.models.route import Route
-from wayfare.models.stops import Stop
-from wayfare.models.costs import Cost
-from wayfare.models.health import Health
-from wayfare.models.vehicle import CarSpecifications, TransportCosts
+from models.location import Location
+from models.route import Route
+from models.stops import Stop
+from models.costs import Cost
+from models.health import Health
+from models.vehicle import CarSpecifications, TransportCosts
 
 class TransportationType(str, Enum):
     CAR = "car"
