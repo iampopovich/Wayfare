@@ -28,7 +28,6 @@ document.getElementById('tripForm').addEventListener('submit', async function(e)
         origin: document.getElementById('origin').value,
         destination: document.getElementById('destination').value,
         transportation_type: document.getElementById('transportationType').value,
-        car_model: document.getElementById('carModel').value,
         passengers: parseInt(document.getElementById('passengers').value),
         budget: {
             min_amount: parseFloat(document.getElementById('minBudget').value),
@@ -39,6 +38,18 @@ document.getElementById('tripForm').addEventListener('submit', async function(e)
             required: document.getElementById('overnightStay').checked
         }
     };
+
+    // Add car specifications if transport type is car
+    if (formData.transportation_type === 'car') {
+        const carModel = document.getElementById('carModel').value;
+        formData.car_specifications = {
+            model: carModel || 'Standard 1.6L',
+            engine_volume: 1.6,
+            fuel_consumption: 11.0,
+            fuel_type: 'gasoline',
+            tank_capacity: 50.0
+        };
+    }
 
     try {
         // Call API
@@ -207,21 +218,56 @@ function displayAccommodationDetails(accommodation) {
 
 function displayCostDetails(costs) {
     const container = document.getElementById('costsDetails');
+    
+    // Create cost items array from available costs
+    const costItems = [];
+    if (costs.fuel_cost) costItems.push(['Fuel', costs.fuel_cost]);
+    if (costs.ticket_cost) costItems.push(['Tickets', costs.ticket_cost]);
+    if (costs.food_cost) costItems.push(['Food', costs.food_cost]);
+    if (costs.water_cost) costItems.push(['Water', costs.water_cost]);
+    if (costs.accommodation_cost) costItems.push(['Accommodation', costs.accommodation_cost]);
+
+    // Additional details for car travel
+    const carDetails = [];
+    if (costs.fuel_consumption) carDetails.push(`Fuel consumption: ${costs.fuel_consumption.toFixed(1)}L`);
+    if (costs.refueling_stops) carDetails.push(`Refueling stops needed: ${costs.refueling_stops}`);
+    
+    // Get car specifications from the form if it's a car journey
+    const transportationType = document.getElementById('transportationType').value;
+    if (transportationType === 'car') {
+        const passengers = parseInt(document.getElementById('passengers').value);
+        const baseMass = 1200; // kg
+        const passengerMass = 75; // kg per passenger
+        const totalMass = baseMass + (passengerMass * passengers);
+        
+        carDetails.unshift(
+            `Vehicle mass: ${baseMass}kg`,
+            `Passengers: ${passengers} × ${passengerMass}kg = ${passengerMass * passengers}kg`,
+            `Total mass: ${totalMass}kg`
+        );
+    }
+
     container.innerHTML = `
         <div class="result-card">
             <h5 class="result-title">Cost Breakdown</h5>
             <div class="cost-breakdown">
-                ${Object.entries(costs.breakdown).map(([category, amount]) => `
+                ${costItems.map(([category, amount]) => `
                     <div class="cost-item">
-                        <span class="cost-label text-capitalize">${category}</span>
+                        <span class="cost-label">${category}</span>
                         <span class="cost-value">${formatCurrency(amount, costs.currency)}</span>
                     </div>
                 `).join('')}
             </div>
+            ${carDetails.length > 0 ? `
+                <div class="car-details mt-3">
+                    <h6>Journey Details</h6>
+                    ${carDetails.map(detail => `<p class="mb-1">${detail}</p>`).join('')}
+                </div>
+            ` : ''}
             <div class="mt-3">
                 <h6>Total Cost</h6>
                 <div class="cost-item total-cost">
-                    <span class="cost-value">${formatCurrency(costs.total_amount, costs.currency)}</span>
+                    <span class="cost-value">${formatCurrency(costs.total_cost, costs.currency)}</span>
                 </div>
             </div>
         </div>
