@@ -103,7 +103,7 @@ function displayResults(data) {
     
     // Update stops tab
     if (data.stops && data.stops.length > 0) {
-        displayStopsDetails(data.stops);
+        displayStopsDetails(data.route);
     }
     
     // Update costs tab
@@ -166,6 +166,7 @@ function shareRoute() {
 document.getElementById('shareRouteButton').addEventListener('click', shareRoute);
 
 function displayRoute(route) {
+    console.log('Route data:', route);
     clearMap();
 
     // Create markers and polyline layers
@@ -184,6 +185,33 @@ function displayRoute(route) {
     markersLayer.addLayer(startMarker);
     markersLayer.addLayer(endMarker);
 
+    // Add refueling and rest stops if they exist
+    if (route.segments) {
+        console.log('Processing segments for stops:', route.segments);
+        route.segments.forEach((segment, index) => {
+            if (segment.refueling_stop) {
+                console.log('Found refueling stop in segment:', index, segment.refueling_stop);
+                const stop = segment.refueling_stop;
+                
+                // Create gas station marker
+                const markerColor = '#e74c3c';  // Red color
+                const markerIcon = L.divIcon({
+                    html: `<div style="background-color: ${markerColor}; width: 24px; height: 24px; border-radius: 12px; display: flex; justify-content: center; align-items: center;">⛽</div>`,
+                    className: 'custom-marker',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 24],
+                    popupAnchor: [0, -24]
+                });
+
+                const marker = L.marker([stop.location.latitude, stop.location.longitude], {
+                    icon: markerIcon
+                }).bindPopup(createStopPopup(stop));
+                
+                markersLayer.addLayer(marker);
+            }
+        });
+    }
+
     // Create path from coordinates
     const pathCoordinates = route.path_points.map(point => [point[0], point[1]]);
     const routePath = L.polyline(pathCoordinates, {
@@ -201,6 +229,61 @@ function displayRoute(route) {
     // Fit map bounds to show entire route
     const bounds = routePath.getBounds();
     map.fitBounds(bounds, { padding: [50, 50] });
+}
+
+function displayStopsDetails(route) {
+    console.log('Displaying stops details:', route);
+    const container = document.getElementById('stopsDetails');
+    
+    // Get all refueling stops from segments
+    const refuelingStops = route.segments
+        .filter(segment => segment.refueling_stop)
+        .map(segment => segment.refueling_stop);
+    
+    console.log('Found refueling stops:', refuelingStops);
+
+    if (!refuelingStops || refuelingStops.length === 0) {
+        container.innerHTML = '<p>No refueling stops required for this journey.</p>';
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="result-card">
+            <h5 class="result-title">Refueling Stops</h5>
+            ${refuelingStops.map((stop, index) => `
+                <div class="stop-card mb-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6>Refueling Stop ${index + 1}</h6>
+                            <p class="mb-1">Location: ${stop.location.address || 'Unknown location'}</p>
+                            <p class="mb-1">Distance: ${formatDistance(stop.distance_from_start)}</p>
+                            <p class="mb-1">Fuel level on arrival: ${stop.fuel_level_before.toFixed(1)}L</p>
+                            <p class="mb-1">Refuel amount: ${stop.fuel_needed.toFixed(1)}L</p>
+                            ${stop.estimated_cost ? `
+                                <p class="mb-1">Estimated cost: ${formatCurrency(stop.estimated_cost.amount, stop.estimated_cost.currency)}</p>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function createStopPopup(stop) {
+    let content = `<div class="stop-popup">
+        <h6>Refueling Stop</h6>
+        <p class="mb-1">Location: ${stop.location.address || 'Unknown location'}</p>
+        <p class="mb-1">Distance: ${formatDistance(stop.distance_from_start)}</p>
+        <p class="mb-1">Fuel level on arrival: ${stop.fuel_level_before.toFixed(1)}L</p>
+        <p class="mb-1">Refuel amount: ${stop.fuel_needed.toFixed(1)}L</p>`;
+
+    if (stop.estimated_cost) {
+        content += `<p class="mb-1">Estimated cost: ${formatCurrency(stop.estimated_cost.amount, stop.estimated_cost.currency)}</p>`;
+    }
+
+    content += '</div>';
+    return content;
 }
 
 function displayRouteDetails(route) {
@@ -240,44 +323,6 @@ function displayRouteDetails(route) {
                     </div>
                 `).join('')}
             </div>
-        </div>
-    `;
-}
-
-function displayStopsDetails(stops) {
-    const container = document.getElementById('stopsDetails');
-    if (!stops || stops.length === 0) {
-        container.innerHTML = '<p>No stops required for this journey.</p>';
-        return;
-    }
-
-    container.innerHTML = `
-        <div class="result-card">
-            <h5 class="result-title">Planned Stops</h5>
-            ${stops.map((stop, index) => `
-                <div class="stop-card mb-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h6>${stop.name || `Stop ${index + 1}`}</h6>
-                            <p class="mb-1">Distance: ${typeof stop.distance_from_start === 'number' ? stop.distance_from_start : 0}km from start</p>
-                            <p class="mb-1">Estimated arrival: ${typeof stop.estimated_arrival_time === 'number' ? formatDuration(stop.estimated_arrival_time) : '0h 0m'}</p>
-                            ${stop.fuel_level_before !== undefined ? `
-                                <p class="mb-1">Fuel level on arrival: ${typeof stop.fuel_level_before === 'number' ? stop.fuel_level_before : 0}L</p>
-                                ${stop.fuel_needed > 0 ? `
-                                    <p class="mb-1">Refuel needed: ${typeof stop.fuel_needed === 'number' ? stop.fuel_needed : 0}L</p>
-                                ` : ''}
-                            ` : ''}
-                            ${stop.rest_time_needed ? `
-                                <p class="mb-1">Rest duration: ${stop.rest_time_needed} minutes</p>
-                            ` : ''}
-                            <p class="mb-0"><small>Type: ${stop.type}</small></p>
-                            ${stop.facilities && stop.facilities.length > 0 ? `
-                                <p class="mb-0"><small>Facilities: ${stop.facilities.join(', ')}</small></p>
-                            ` : ''}
-                        </div>
-                    </div>
-                </div>
-            `).join('')}
         </div>
     `;
 }
@@ -392,16 +437,27 @@ function formatCurrency(amount, currency = 'USD') {
     }).format(amount);
 }
 
-function createStopPopup(segment) {
-    return `
-        <div class="popup-content">
-            <h6>${segment.start_location.address || 'Stop'}</h6>
-            <p>Duration: ${formatDuration(segment.duration)}</p>
-            ${segment.overnight_stay ? `
-                <p>Overnight Stay: ${segment.overnight_stay.name}</p>
-            ` : ''}
-        </div>
-    `;
+function createStopPopup(stop) {
+    let content = `<div class="stop-popup">
+        <h6>${stop.name || 'Stop'}</h6>
+        <p class="mb-1">Distance: ${formatDistance(stop.distance_from_start)}</p>`;
+
+    if (stop.fuel_needed > 0) {
+        content += `
+            <p class="mb-1">Fuel level on arrival: ${stop.fuel_level_before.toFixed(1)}L</p>
+            <p class="mb-1">Refuel amount: ${stop.fuel_needed.toFixed(1)}L</p>`;
+    }
+
+    if (stop.rest_time_needed) {
+        content += `<p class="mb-1">Rest time: ${stop.rest_time_needed} minutes</p>`;
+    }
+
+    if (stop.facilities && stop.facilities.length > 0) {
+        content += `<p class="mb-0"><small>Facilities: ${stop.facilities.join(', ')}</small></p>`;
+    }
+
+    content += '</div>';
+    return content;
 }
 
 function createSegmentCard(segment) {

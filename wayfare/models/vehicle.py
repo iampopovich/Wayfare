@@ -40,6 +40,7 @@ class TransportCosts(BaseModel):
     fuel_cost: Optional[float] = Field(None, description="Cost of fuel for the journey")
     fuel_consumption: Optional[float] = Field(None, description="Total fuel consumption in liters")
     refueling_stops: Optional[int] = Field(None, description="Number of refueling stops needed")
+    maintenance_cost: Optional[float] = Field(None, description="Estimated maintenance cost for the journey")
     
     # For public transport
     ticket_cost: Optional[float] = Field(None, description="Cost of tickets")

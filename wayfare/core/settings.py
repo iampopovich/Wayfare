@@ -15,12 +15,12 @@ class Settings(BaseSettings):
 
     # Maps API Keys
     GOOGLE_MAPS_API_KEY: str
-    MAPSME_API_KEY: str
+    MAPSME_API_KEY: str | None = None
 
     # Travel API Keys
-    BOOKING_API_KEY: str
-    TRIP_API_KEY: str
-    AIRBNB_API_KEY: str
+    BOOKING_API_KEY: str | None = None
+    TRIP_API_KEY: str | None = None
+    AIRBNB_API_KEY: str | None = None
 
     # Optional Redis Configuration
     REDIS_URL: str = "redis://localhost:6379/0"
