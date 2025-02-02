@@ -10,6 +10,8 @@ from models.vehicle import TransportCosts, CarSpecifications
 from repositories.maps.google_maps import GoogleMapsRepository
 from agents.stops import StopsAgent
 from agents.fuel import FuelPriceAgent
+from agents.transport_prices import TransportPriceAgent
+from services.search import SearchService
 import logging
 import aiohttp
 import asyncio
@@ -27,17 +29,12 @@ class TravelService:
         TransportationType.TRAIN: "transit"
     }
 
-    # Average fuel prices by type (USD per liter)
-    FUEL_PRICES = {
-        "gasoline": 1.2,
-        "diesel": 1.1,
-        "electric": 0.15  # Price per kWh
-    }
-
-    def __init__(self, maps_repository: GoogleMapsRepository):
+    def __init__(self, maps_repository: GoogleMapsRepository, search_service: SearchService):
         self.maps_repository = maps_repository
+        self.search_service = search_service
         self.stops_agent = StopsAgent()
         self.fuel_agent = FuelPriceAgent()
+        self.transport_price_agent = TransportPriceAgent(search_service)
 
     # Google Maps supported travel modes
     TRANSPORT_MODE_MAPPING = {
@@ -129,7 +126,42 @@ class TravelService:
                 currency="USD"
             )
             
-        elif transport_type in [TransportationType.BUS, TransportationType.TRAIN, TransportationType.PLANE]:
+        elif transport_type in [TransportationType.BUS, TransportationType.TRAIN]:
+            # Get ticket prices from TransportPriceAgent
+            price_response = await self.transport_price_agent.process(
+                origin=request.origin,
+                destination=request.destination,
+                transport_type=transport_type.value,
+                date=request.departure_time.strftime("%Y-%m-%d") if request.departure_time else None
+            )
+            
+            if price_response["success"]:
+                prices = price_response["data"]["prices"]
+                ticket_cost = prices["average"] if prices["average"] else 50.0  # Default fallback price
+                
+                # Add booking URL if available
+                booking_links = price_response["data"]["booking_links"]
+                booking_url = booking_links[0]["url"] if booking_links else None
+                
+                return TransportCosts(
+                    ticket_cost=ticket_cost,
+                    booking_url=booking_url,
+                    total_cost=ticket_cost,
+                    currency="USD"
+                )
+            else:
+                logger.warning(f"Failed to get transport prices: {price_response['error']}")
+                # Fallback to distance-based estimation
+                distance_km = distance_meters / 1000
+                estimated_cost = distance_km * 0.1  # $0.1 per km
+                
+                return TransportCosts(
+                    ticket_cost=estimated_cost,
+                    total_cost=estimated_cost,
+                    currency="USD"
+                )
+            
+        elif transport_type in [TransportationType.PLANE]:
             # Set base ticket prices per km for different transport types
             ticket_rates = {
                 TransportationType.BUS: 0.1,    # $0.1 per km
