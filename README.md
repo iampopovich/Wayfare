@@ -1,4 +1,6 @@
 ### **Wayfare – AI-powered Travel Planner** 🌍✈️
+<img width="1124" alt="Screenshot 2025-02-02 at 17 23 52" src="https://github.com/user-attachments/assets/93d1f324-c10f-4955-997b-1c029969a5ee" />
+
 
 [![Wayfare Logo](https://your-logo-url.com)](https://your-project-url.com)  
 
