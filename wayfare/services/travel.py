@@ -353,7 +353,7 @@ class TravelService:
             logger.info("Calculating transport costs")
             costs = await self._calculate_transport_costs(
                 sum(segment.distance for segment in route.segments),
-                sum(segment.duration for segment in route_segments),
+                sum(segment.duration for segment in route.segments),
                 request.transportation_type,
                 request
             )
@@ -367,7 +367,7 @@ class TravelService:
                     request.transportation_type
                 ),
                 activity_breakdown={
-                    request.transportation_type.value: sum(segment.distance for segment in route_segments) * 0.1
+                    request.transportation_type.value: sum(segment.distance for segment in route.segments) * 0.1
                 }
             )
             logger.info(f"Calculated health impact: {health}")
