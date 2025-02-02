@@ -103,7 +103,12 @@ function displayResults(data) {
     
     // Update stops tab
     if (data.stops && data.stops.length > 0) {
-        displayStopsDetails(data.route);
+        displayStopsDetails(data.stops);
+    }
+    
+    // Update weather tab
+    if (data.weather) {
+        displayWeatherDetails(data.weather);
     }
     
     // Update costs tab
@@ -231,37 +236,17 @@ function displayRoute(route) {
     map.fitBounds(bounds, { padding: [50, 50] });
 }
 
-function displayStopsDetails(route) {
-    console.log('Displaying stops details:', route);
+function displayStopsDetails(stops) {
+    console.log('Displaying stops details:', stops);
     const container = document.getElementById('stopsDetails');
     
-    // Get all stops from the route data
-    const allStops = [];
-    
-    // Add refueling stops from segments
-    route.segments.forEach(segment => {
-        if (segment.refueling_stop) {
-            allStops.push({
-                ...segment.refueling_stop,
-                type: 'refueling'
-            });
-        }
-    });
-    
-    // Add other types of stops if they exist in route.stops
-    if (route.stops && route.stops.length > 0) {
-        allStops.push(...route.stops);
-    }
-    
-    console.log('Found all stops:', allStops);
-
-    if (allStops.length === 0) {
+    if (!stops || stops.length === 0) {
         container.innerHTML = '<p>No stops planned for this journey.</p>';
         return;
     }
 
     // Group stops by type
-    const stopsByType = allStops.reduce((acc, stop) => {
+    const stopsByType = stops.reduce((acc, stop) => {
         const type = stop.type || 'other';
         if (!acc[type]) acc[type] = [];
         acc[type].push(stop);
@@ -270,10 +255,10 @@ function displayStopsDetails(route) {
 
     container.innerHTML = `
         <div class="result-card">
-            ${Object.entries(stopsByType).map(([type, stops]) => `
+            ${Object.entries(stopsByType).map(([type, typeStops]) => `
                 <div class="mb-4">
                     <h5 class="result-title">${type.charAt(0).toUpperCase() + type.slice(1)} Stops</h5>
-                    ${stops.map((stop, index) => `
+                    ${typeStops.map((stop, index) => `
                         <div class="stop-card mb-3">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
@@ -496,6 +481,190 @@ function displayHealthDetails(health) {
             </div>
         </div>
     `;
+}
+
+function displayWeatherDetails(weather) {
+    console.log('Displaying weather details:', weather);
+    const container = document.getElementById('weatherDetails');
+    
+    if (!weather || (!weather.origin && !weather.destination)) {
+        console.warn('No weather data available');
+        container.innerHTML = '<p>Weather data not available.</p>';
+        return;
+    }
+
+    const createWeatherCard = (locationData, title) => {
+        console.log(`Creating weather card for ${title}:`, locationData);
+        return `
+            <div class="weather-card mb-4">
+                <h6 class="mb-3">${title} - ${locationData.location}</h6>
+                
+                <div class="current-weather mb-3">
+                    <h6 class="text-muted">Current Conditions</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="mb-1">Temperature: ${locationData.weather.current.temperature}°C</p>
+                            <p class="mb-1">Wind Speed: ${locationData.weather.current.wind_speed} m/s</p>
+                            <p class="mb-0">Time: ${new Date(locationData.weather.current.time).toLocaleString()}</p>
+                        </div>
+                        <div class="weather-icon">
+                            ${locationData.weather.current.temperature > 20 ? '☀️' : 
+                              locationData.weather.current.temperature < 0 ? '❄️' : '⛅'}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="forecast">
+                    <h6 class="text-muted">24-Hour Forecast</h6>
+                    <div class="forecast-chart">
+                        <canvas id="${title.toLowerCase()}-chart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        `;
+    };
+
+    container.innerHTML = `
+        <div class="result-card">
+            <h5 class="result-title">Weather Conditions</h5>
+            
+            ${weather.origin ? createWeatherCard(weather.origin, 'Origin') : ''}
+            ${weather.destination ? createWeatherCard(weather.destination, 'Destination') : ''}
+            
+            ${weather.recommendations && weather.recommendations.length > 0 ? `
+                <div class="weather-recommendations mt-3">
+                    <h6 class="text-muted">Weather Recommendations</h6>
+                    <ul class="list-unstyled">
+                        ${weather.recommendations.map(rec => `
+                            <li class="mb-2">
+                                <i class="bi bi-info-circle text-primary"></i>
+                                ${rec}
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+        </div>
+    `;
+
+    // Create charts if weather data is available
+    if (weather.origin) {
+        console.log('Creating origin weather chart with data:', weather.origin.weather.forecast);
+        createWeatherChart(
+            'origin-chart',
+            weather.origin.weather.forecast
+        );
+    }
+    
+    if (weather.destination) {
+        console.log('Creating destination weather chart with data:', weather.destination.weather.forecast);
+        createWeatherChart(
+            'destination-chart',
+            weather.destination.weather.forecast
+        );
+    }
+}
+
+function createWeatherChart(canvasId, forecast) {
+    console.log(`Creating weather chart for ${canvasId}:`, forecast);
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) {
+        console.error(`Canvas element ${canvasId} not found`);
+        return;
+    }
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+        console.error(`Could not get 2D context for ${canvasId}`);
+        return;
+    }
+    
+    // Format times for display
+    const labels = forecast.times.map(time => {
+        const date = new Date(time);
+        if (isNaN(date.getTime())) {
+            console.error(`Invalid time value: ${time}`);
+            return time;
+        }
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    });
+
+    console.log('Chart labels:', labels);
+    console.log('Temperature data:', forecast.temperatures);
+    console.log('Humidity data:', forecast.humidity);
+    console.log('Wind speed data:', forecast.wind_speed);
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Temperature (°C)',
+                    data: forecast.temperatures,
+                    borderColor: 'rgb(255, 99, 132)',
+                    tension: 0.1,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Humidity (%)',
+                    data: forecast.humidity,
+                    borderColor: 'rgb(54, 162, 235)',
+                    tension: 0.1,
+                    yAxisID: 'y1'
+                },
+                {
+                    label: 'Wind Speed (m/s)',
+                    data: forecast.wind_speed,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1,
+                    yAxisID: 'y2'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Temperature (°C)'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Humidity (%)'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                },
+                y2: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Wind Speed (m/s)'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            }
+        }
+    });
 }
 
 // Utility functions

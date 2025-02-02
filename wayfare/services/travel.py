@@ -8,9 +8,11 @@ from models.costs import Cost
 from models.health import Health
 from models.vehicle import TransportCosts, CarSpecifications
 from repositories.maps.google_maps import GoogleMapsRepository
+from repositories.weather.open_weather_map import WeatherRepository
 from agents.stops import StopsAgent
 from agents.fuel import FuelPriceAgent
 from agents.transport_prices import TransportPriceAgent
+from agents.weather import WeatherAgent
 from services.search import SearchService
 import logging
 import aiohttp
@@ -31,13 +33,18 @@ class TravelService:
     }
 
     def __init__(
-        self, maps_repository: GoogleMapsRepository, search_service: SearchService
+        self, 
+        maps_repository: GoogleMapsRepository, 
+        weather_repository: WeatherRepository, 
+        search_service: SearchService
     ):
         self.maps_repository = maps_repository
+        self.weather_repository = weather_repository
         self.search_service = search_service
         self.stops_agent = StopsAgent()
         self.fuel_agent = FuelPriceAgent()
         self.transport_price_agent = TransportPriceAgent(search_service)
+        self.weather_agent = WeatherAgent(weather_repository=weather_repository)
 
     # Google Maps supported travel modes
     TRANSPORT_MODE_MAPPING = {
@@ -434,8 +441,31 @@ class TravelService:
             )
             logger.info(f"Calculated health impact: {health}")
 
+            # Calculate weather data
+            logger.info("Calculating weather data")
+            route_dict = {
+                "segments": [
+                    {
+                        "start_location": {
+                            "latitude": segment.start_location.latitude,
+                            "longitude": segment.start_location.longitude,
+                            "address": segment.start_location.address
+                        },
+                        "end_location": {
+                            "latitude": segment.end_location.latitude,
+                            "longitude": segment.end_location.longitude,
+                            "address": segment.end_location.address
+                        }
+                    }
+                    for segment in route.segments
+                ]
+            }
+            weather_response = await self.weather_agent.process(route=route_dict)
+            weather_data = weather_response.get('data', {}) if weather_response.get('success') else {}
+            logger.info(f"Calculated weather data: {weather_data}")
+
             response = TravelResponse(
-                route=route, stops=stops, costs=costs, health=health
+                route=route, stops=stops, costs=costs, health=health, weather=weather_data
             )
             logger.info("Travel plan completed successfully")
             return response

@@ -2,10 +2,11 @@ from functools import lru_cache
 from fastapi import Depends
 
 from config import get_settings
-from services.travel import TravelService
+from repositories.maps.google_maps import GoogleMapsRepository
+from repositories.weather.open_weather_map import WeatherRepository
 from services.maps import MapsService
 from services.search import SearchService
-from repositories.maps.google_maps import GoogleMapsRepository
+from services.travel import TravelService
 
 # Load environment variables
 # load_dotenv()
@@ -15,6 +16,12 @@ from repositories.maps.google_maps import GoogleMapsRepository
 def get_maps_repository() -> GoogleMapsRepository:
     """Get GoogleMapsRepository instance."""
     return GoogleMapsRepository(api_key=get_settings().GOOGLE_MAPS_API_KEY)
+
+
+@lru_cache()
+def get_weather_repository() -> WeatherRepository:
+    """Get WeatherRepository instance."""
+    return WeatherRepository()
 
 
 def get_search_service() -> SearchService:
@@ -31,7 +38,12 @@ def get_maps_service(
 
 def get_travel_service(
     maps_repository: GoogleMapsRepository = Depends(get_maps_repository),
+    weather_repository: WeatherRepository = Depends(get_weather_repository),
     search_service: SearchService = Depends(get_search_service),
 ) -> TravelService:
     """Get TravelService instance."""
-    return TravelService(maps_repository=maps_repository, search_service=search_service)
+    return TravelService(
+        maps_repository=maps_repository,
+        weather_repository=weather_repository,
+        search_service=search_service
+    )
