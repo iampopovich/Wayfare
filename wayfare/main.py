@@ -8,6 +8,7 @@ import logging
 import time
 from wayfare.core.logging import setup_logging
 import uvicorn
+from fastapi.exceptions import HTTPException
 
 # Load environment variables from .env file
 load_dotenv()
@@ -94,12 +95,33 @@ async def api_welcome():
         "openapi": "/openapi.json"
     })
 
-PORT = int(os.getenv('PORT', 8000))
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": str(exc.detail)}
+    )
+
+@app.get("/openapi.json", include_in_schema=False)
+async def get_openapi_json():
+    return JSONResponse({
+        "documentation": "/docs",
+        "openapi": "/openapi.json"
+    })
 
 if __name__ == "__main__":
+    # Get port from environment variable with default value of 10000 for Render
+    port = int(os.getenv('PORT', 10000))
+    
+    # Ensure we're not using any reserved ports
+    reserved_ports = {18012, 18013, 19099}
+    if port in reserved_ports:
+        raise ValueError(f"Port {port} is reserved by Render and cannot be used")
+    
+    # Run the server
     uvicorn.run(
         "wayfare.main:app",
-        host="0.0.0.0",
-        port=PORT,
+        host="0.0.0.0",  # Required for Render
+        port=port,
         reload=True
     )
