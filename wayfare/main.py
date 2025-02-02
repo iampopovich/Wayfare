@@ -73,7 +73,7 @@ app.include_router(travel.router, prefix="/api/v1/travel", tags=["travel"])
 @app.get("/")
 async def root():
     """Serve the main application page."""
-    return FileResponse("wayfare/static/index.html")
+    return FileResponse("static/index.html")
 
 @app.get("/api/v1")
 async def api_welcome():
