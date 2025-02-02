@@ -76,49 +76,53 @@ function displayResults(data) {
     displayRouteDetails(data.route);
     
     // Update stops tab
-    displayStopsDetails(data.stops);
-    
-    // Update accommodation tab
-    if (data.accommodation) {
-        displayAccommodationDetails(data.accommodation);
+    if (data.stops && data.stops.length > 0) {
+        displayStopsDetails(data.stops);
     }
     
     // Update costs tab
-    displayCostDetails(data.total_costs);
+    displayCostDetails(data.costs);
     
     // Update health tab
-    displayHealthDetails(data.calories);
+    displayHealthDetails(data.health);
 }
 
 function displayRoute(route) {
-    if (routeLayer) {
-        map.removeLayer(routeLayer);
-    }
-    if (markersLayer) {
-        map.removeLayer(markersLayer);
-    }
+    clearMap();
 
-    // Add route polyline
-    const coordinates = route.segments.map(segment => [
-        segment.start_location.latitude,
-        segment.start_location.longitude
-    ]);
-    coordinates.push([
-        route.segments[route.segments.length - 1].end_location.latitude,
-        route.segments[route.segments.length - 1].end_location.longitude
-    ]);
+    // Create markers and polyline layers
+    routeLayer = L.layerGroup();
+    markersLayer = L.layerGroup();
 
-    routeLayer = L.polyline(coordinates, {color: '#4a90e2'}).addTo(map);
-    map.fitBounds(routeLayer.getBounds());
+    // Add start and end markers
+    const firstSegment = route.segments[0];
+    const lastSegment = route.segments[route.segments.length - 1];
 
-    // Add markers for stops
-    markersLayer = L.layerGroup().addTo(map);
-    route.segments.forEach(segment => {
-        // Start point
-        L.marker([segment.start_location.latitude, segment.start_location.longitude])
-            .bindPopup(createStopPopup(segment))
-            .addTo(markersLayer);
+    const startMarker = L.marker([firstSegment.start_location.latitude, firstSegment.start_location.longitude])
+        .bindPopup('Start: ' + firstSegment.start_location.address);
+    const endMarker = L.marker([lastSegment.end_location.latitude, lastSegment.end_location.longitude])
+        .bindPopup('End: ' + lastSegment.end_location.address);
+
+    markersLayer.addLayer(startMarker);
+    markersLayer.addLayer(endMarker);
+
+    // Create path from coordinates
+    const pathCoordinates = route.path_points.map(point => [point[0], point[1]]);
+    const routePath = L.polyline(pathCoordinates, {
+        color: '#3388ff',
+        weight: 5,
+        opacity: 0.8
     });
+
+    routeLayer.addLayer(routePath);
+
+    // Add all layers to map
+    routeLayer.addTo(map);
+    markersLayer.addTo(map);
+
+    // Fit map bounds to show entire route
+    const bounds = routePath.getBounds();
+    map.fitBounds(bounds, { padding: [50, 50] });
 }
 
 function displayRouteDetails(route) {
@@ -129,22 +133,62 @@ function displayRouteDetails(route) {
             <div class="result-detail">
                 <p><strong>Total Distance:</strong> ${formatDistance(route.total_distance)}</p>
                 <p><strong>Total Duration:</strong> ${formatDuration(route.total_duration)}</p>
-                <p><strong>Total Cost:</strong> ${formatCurrency(route.total_cost, route.currency)}</p>
+            </div>
+            <div class="route-segments mt-3">
+                <h6>Route Segments</h6>
+                ${route.segments.map((segment, index) => `
+                    <div class="segment-card mb-2">
+                        <div class="segment-header">
+                            <strong>Segment ${index + 1}</strong>
+                        </div>
+                        <div class="segment-details">
+                            <p class="mb-1"><small>From: ${segment.start_location.address || 'Start'}</small></p>
+                            <p class="mb-1"><small>To: ${segment.end_location.address || 'End'}</small></p>
+                            <p class="mb-1"><small>Distance: ${formatDistance(segment.distance)}</small></p>
+                            <p class="mb-1"><small>Duration: ${formatDuration(segment.duration)}</small></p>
+                        </div>
+                        ${segment.instructions.length > 0 ? `
+                            <div class="segment-instructions">
+                                <small>
+                                    <strong>Instructions:</strong>
+                                    <ul class="mb-0">
+                                        ${segment.instructions.map(instruction => `
+                                            <li>${instruction}</li>
+                                        `).join('')}
+                                    </ul>
+                                </small>
+                            </div>
+                        ` : ''}
+                    </div>
+                `).join('')}
             </div>
         </div>
-        ${route.segments.map(segment => createSegmentCard(segment)).join('')}
     `;
 }
 
 function displayStopsDetails(stops) {
     const container = document.getElementById('stopsDetails');
+    if (!stops || stops.length === 0) {
+        container.innerHTML = `
+            <div class="result-card">
+                <h5 class="result-title">Planned Stops</h5>
+                <p>No stops planned for this route.</p>
+            </div>
+        `;
+        return;
+    }
+
     container.innerHTML = `
         <div class="result-card">
             <h5 class="result-title">Planned Stops</h5>
-            ${Object.entries(stops.stop_types).map(([type, stops]) => `
-                <div class="mb-3">
-                    <h6 class="text-capitalize">${type} Stops</h6>
-                    ${stops.map(stop => createStopCard(stop)).join('')}
+            ${stops.map(stop => `
+                <div class="stop-card mb-3">
+                    <h6>${stop.type} Stop</h6>
+                    <p class="mb-1"><small>Location: ${stop.location.address}</small></p>
+                    <p class="mb-1"><small>Duration: ${formatDuration(stop.duration)}</small></p>
+                    ${stop.facilities.length > 0 ? `
+                        <p class="mb-0"><small>Facilities: ${stop.facilities.join(', ')}</small></p>
+                    ` : ''}
                 </div>
             `).join('')}
         </div>
@@ -167,7 +211,7 @@ function displayCostDetails(costs) {
         <div class="result-card">
             <h5 class="result-title">Cost Breakdown</h5>
             <div class="cost-breakdown">
-                ${Object.entries(costs.cost_breakdown).map(([category, amount]) => `
+                ${Object.entries(costs.breakdown).map(([category, amount]) => `
                     <div class="cost-item">
                         <span class="cost-label text-capitalize">${category}</span>
                         <span class="cost-value">${formatCurrency(amount, costs.currency)}</span>
@@ -175,10 +219,10 @@ function displayCostDetails(costs) {
                 `).join('')}
             </div>
             <div class="mt-3">
-                <h6>Cost Optimization Tips</h6>
-                <ul>
-                    ${costs.cost_optimization_tips.map(tip => `<li>${tip}</li>`).join('')}
-                </ul>
+                <h6>Total Cost</h6>
+                <div class="cost-item total-cost">
+                    <span class="cost-value">${formatCurrency(costs.total_amount, costs.currency)}</span>
+                </div>
             </div>
         </div>
     `;
@@ -187,20 +231,16 @@ function displayCostDetails(costs) {
 function displayHealthDetails(health) {
     const container = document.getElementById('healthDetails');
     container.innerHTML = `
-        <div class="row">
-            <div class="col-md-4">
-                <div class="health-stat">
-                    <div class="health-stat-value">${health.total_calories}</div>
-                    <div class="health-stat-label">Total Calories</div>
-                </div>
-            </div>
-            <div class="col-md-8">
-                <div class="result-card">
-                    <h5 class="result-title">Activity Breakdown</h5>
+        <div class="result-card">
+            <h5 class="result-title">Health Impact</h5>
+            <div class="health-details">
+                <p><strong>Total Calories Burned:</strong> ${Math.round(health.total_calories)} kcal</p>
+                <div class="activity-breakdown mt-3">
+                    <h6>Activity Breakdown</h6>
                     ${Object.entries(health.activity_breakdown).map(([activity, calories]) => `
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="text-capitalize">${activity}</span>
-                            <span>${calories} calories</span>
+                        <div class="activity-item">
+                            <span class="activity-label text-capitalize">${activity}</span>
+                            <span class="activity-value">${Math.round(calories)} kcal</span>
                         </div>
                     `).join('')}
                 </div>
@@ -220,10 +260,10 @@ function formatDuration(minutes) {
     return `${hours}h ${mins}m`;
 }
 
-function formatCurrency(amount, currency) {
+function formatCurrency(amount, currency = 'USD') {
     return new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: currency
+        currency: currency || 'USD'  // Default to USD if currency is not provided
     }).format(amount);
 }
 

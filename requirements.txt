@@ -19,3 +19,4 @@ python-jose[cryptography]>=3.3.0
 tenacity>=8.2.3
 redis>=5.0.1
 celery>=5.3.6
+polyline==2.0.0

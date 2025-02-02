@@ -127,6 +127,106 @@ body {
     font-size: 0.9rem;
 }
 
+/* Route Styles */
+.route-segments {
+    border-top: 1px solid #eee;
+    padding-top: 1rem;
+}
+
+.segment-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 0.25rem;
+    padding: 1rem;
+}
+
+.segment-header {
+    margin-bottom: 0.5rem;
+    color: #495057;
+}
+
+.segment-details {
+    color: #6c757d;
+}
+
+.segment-instructions {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.segment-instructions ul {
+    padding-left: 1.25rem;
+    margin-bottom: 0;
+}
+
+/* Stop Styles */
+.stop-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 0.25rem;
+    padding: 1rem;
+}
+
+.stop-card h6 {
+    color: #495057;
+    margin-bottom: 0.75rem;
+}
+
+/* Cost Styles */
+.cost-breakdown {
+    margin-top: 1rem;
+}
+
+.cost-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.cost-item:last-child {
+    border-bottom: none;
+}
+
+.total-cost {
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #28a745;
+}
+
+/* Health Styles */
+.health-details {
+    padding: 1rem 0;
+}
+
+.activity-breakdown {
+    margin-top: 1rem;
+}
+
+.activity-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+/* Error Message */
+#errorMessage {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1000;
+    max-width: 400px;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+}
+
 /* Responsive Adjustments */
 @media (max-width: 768px) {
     .container {

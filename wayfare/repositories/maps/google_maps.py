@@ -1,8 +1,12 @@
 from typing import Optional, List, Dict, Any
 import googlemaps
+import polyline
 from wayfare.models.base import GeoLocation, PlaceDetails, SearchResult
 from wayfare.models.location import Location
 from wayfare.models.route import Route, RouteSegment
+import logging
+
+logger = logging.getLogger(__name__)
 
 class GoogleMapsRepository:
     def __init__(self, api_key: str):
@@ -55,56 +59,74 @@ class GoogleMapsRepository:
         origin: Location,
         destination: Location,
         mode: str = "driving",
-        waypoints: Optional[List[Location]] = None
+        waypoints: Optional[List[Location]] = None,
+        alternatives: bool = True
     ) -> Route:
-        """Get directions between two points."""
+        """Get directions between two points using actual roads and routes."""
+        logger.info(f"Getting directions from {origin} to {destination} using mode: {mode}")
+        
         waypoints_list = None
         if waypoints:
             waypoints_list = [f"{w.latitude},{w.longitude}" for w in waypoints]
 
-        result = self.client.directions(
-            origin=f"{origin.latitude},{origin.longitude}",
-            destination=f"{destination.latitude},{destination.longitude}",
-            mode=mode,
-            waypoints=waypoints_list
-        )
-
-        if not result:
-            raise ValueError("No route found")
-
-        route = result[0]
-        legs = route["legs"]
-
-        segments = []
-        total_distance = 0
-        total_duration = 0
-
-        for leg in legs:
-            segment = RouteSegment(
-                start_location=Location(
-                    latitude=leg["start_location"]["lat"],
-                    longitude=leg["start_location"]["lng"]
-                ),
-                end_location=Location(
-                    latitude=leg["end_location"]["lat"],
-                    longitude=leg["end_location"]["lng"]
-                ),
-                distance=leg["distance"]["value"],
-                duration=leg["duration"]["value"] / 60,  # Convert to minutes
-                polyline=leg.get("steps", [{}])[0].get("polyline", {}).get("points", ""),
-                instructions=[step["html_instructions"] for step in leg.get("steps", [])]
+        try:
+            result = self.client.directions(
+                origin=f"{origin.latitude},{origin.longitude}",
+                destination=f"{destination.latitude},{destination.longitude}",
+                mode=mode,
+                waypoints=waypoints_list,
+                alternatives=alternatives,  # Get alternative routes if available
+                optimize_waypoints=True if waypoints else False
             )
-            segments.append(segment)
-            total_distance += leg["distance"]["value"]
-            total_duration += leg["duration"]["value"]
 
-        return Route(
-            segments=segments,
-            total_distance=total_distance,
-            total_duration=total_duration / 60,  # Convert to minutes
-            overview_polyline=route.get("overview_polyline", {}).get("points", ""),
-            bounds=route.get("bounds", {})
-        )
+            if not result:
+                raise ValueError(f"No route found between {origin} and {destination}")
+
+            # Get the first (usually optimal) route
+            route = result[0]
+            legs = route["legs"]
+
+            segments = []
+            total_distance = 0
+            total_duration = 0
+            path_points = []
+
+            for leg in legs:
+                # Extract detailed path points from each step
+                for step in leg.get("steps", []):
+                    points = polyline.decode(step["polyline"]["points"])
+                    path_points.extend(points)
+
+                segment = RouteSegment(
+                    start_location=Location(
+                        latitude=leg["start_location"]["lat"],
+                        longitude=leg["start_location"]["lng"],
+                        address=leg.get("start_address", "")
+                    ),
+                    end_location=Location(
+                        latitude=leg["end_location"]["lat"],
+                        longitude=leg["end_location"]["lng"],
+                        address=leg.get("end_address", "")
+                    ),
+                    distance=leg["distance"]["value"],
+                    duration=leg["duration"]["value"] / 60,  # Convert to minutes
+                    polyline=step["polyline"]["points"],
+                    instructions=[step["html_instructions"] for step in leg.get("steps", [])]
+                )
+                segments.append(segment)
+                total_distance += leg["distance"]["value"]
+                total_duration += leg["duration"]["value"]
+
+            return Route(
+                segments=segments,
+                total_distance=total_distance,
+                total_duration=total_duration / 60,  # Convert to minutes
+                path_points=path_points
+            )
+
+        except Exception as e:
+            logger.error(f"Error getting directions: {str(e)}", exc_info=True)
+            raise ValueError(f"Failed to get directions: {str(e)}")
 
     async def search(
         self,
