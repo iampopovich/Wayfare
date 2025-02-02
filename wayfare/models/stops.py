@@ -2,6 +2,7 @@ from typing import List, Optional, Any
 from pydantic import BaseModel, Field
 from models.location import Location
 
+
 class Stop(BaseModel):
     location: Location
     type: str = Field(..., description="Type of stop (rest, food, fuel, etc.)")

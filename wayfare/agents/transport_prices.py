@@ -3,6 +3,7 @@ from datetime import datetime
 from agents.base import BaseAgent, AgentResponse
 from services.search import SearchService
 
+
 class TransportPriceAgent(BaseAgent):
     def __init__(self, search_service: SearchService):
         super().__init__()
@@ -20,25 +21,20 @@ class TransportPriceAgent(BaseAgent):
         self.chain = self._create_chain(
             template=template,
             input_variables=[
-                "origin", "destination", "transport_type",
-                "date", "requirements"
-            ]
+                "origin",
+                "destination",
+                "transport_type",
+                "date",
+                "requirements",
+            ],
         )
 
     async def process(self, **kwargs) -> Dict[str, Any]:
         try:
             prices = await self._find_transport_prices(**kwargs)
-            return AgentResponse(
-                success=True,
-                data=prices,
-                error=None
-            ).to_dict()
+            return AgentResponse(success=True, data=prices, error=None).to_dict()
         except Exception as e:
-            return AgentResponse(
-                success=False,
-                data={},
-                error=str(e)
-            ).to_dict()
+            return AgentResponse(success=False, data={}, error=str(e)).to_dict()
 
     async def _find_transport_prices(self, **kwargs) -> Dict[str, Any]:
         """Find transportation prices using search service."""
@@ -46,34 +42,33 @@ class TransportPriceAgent(BaseAgent):
         destination = kwargs.get("destination", "")
         transport_type = kwargs.get("transport_type", "bus")
         date = kwargs.get("date", datetime.now().strftime("%Y-%m-%d"))
-        
+
         # Format search queries for different aspects
         queries = [
             f"{transport_type} ticket from {origin} to {destination}",
             f"{transport_type} fare {origin} {destination}",
             f"{origin} to {destination} {transport_type} schedule price",
-            f"how much does {transport_type} ticket cost from {origin} to {destination}"
+            f"how much does {transport_type} ticket cost from {origin} to {destination}",
         ]
-        
+
         all_results = []
         for query in queries:
             results = await self.search_service.search_prices(
-                query=query,
-                currency="USD"  # Can be made configurable
+                query=query, currency="USD"  # Can be made configurable
             )
             all_results.extend(results)
-        
+
         # Process and analyze results
         price_data = self._analyze_price_results(all_results)
-        
+
         # Find schedule information
         schedule_query = f"{transport_type} schedule {origin} to {destination} {date}"
         schedule_results = await self.search_service.search(
             query=schedule_query,
             engines=["duckduckgo"],
-            filters={"content_type": ["schedule", "timetable"]}
+            filters={"content_type": ["schedule", "timetable"]},
         )
-        
+
         return {
             "prices": price_data,
             "schedules": self._extract_schedule_info(schedule_results),
@@ -82,10 +77,10 @@ class TransportPriceAgent(BaseAgent):
                 "origin": origin,
                 "destination": destination,
                 "transport_type": transport_type,
-                "date": date
-            }
+                "date": date,
+            },
         }
-    
+
     def _analyze_price_results(self, results: list) -> Dict[str, Any]:
         """Analyze price results to extract meaningful price information."""
         if not results:
@@ -94,31 +89,33 @@ class TransportPriceAgent(BaseAgent):
                 "min": None,
                 "max": None,
                 "currency": "USD",
-                "confidence": 0
+                "confidence": 0,
             }
-        
+
         prices = []
         for result in results:
             if isinstance(result.get("price"), (int, float)):
                 prices.append(result["price"])
-        
+
         if not prices:
             return {
                 "average": None,
                 "min": None,
                 "max": None,
                 "currency": "USD",
-                "confidence": 0
+                "confidence": 0,
             }
-        
+
         return {
             "average": sum(prices) / len(prices),
             "min": min(prices),
             "max": max(prices),
             "currency": "USD",
-            "confidence": min(1.0, len(prices) / 10)  # Higher confidence with more sources
+            "confidence": min(
+                1.0, len(prices) / 10
+            ),  # Higher confidence with more sources
         }
-    
+
     def _extract_schedule_info(self, results: list) -> list:
         """Extract schedule information from search results."""
         schedules = []
@@ -128,19 +125,24 @@ class TransportPriceAgent(BaseAgent):
             schedule = {
                 "source": result["url"],
                 "details": result["snippet"],
-                "confidence": 0.5  # Can be adjusted based on source reliability
+                "confidence": 0.5,  # Can be adjusted based on source reliability
             }
             schedules.append(schedule)
         return schedules
-    
+
     def _extract_booking_links(self, results: list) -> list:
         """Extract relevant booking links from results."""
         booking_links = []
         for result in results:
-            if any(keyword in result["url"].lower() for keyword in ["book", "ticket", "reservation"]):
-                booking_links.append({
-                    "url": result["url"],
-                    "title": result["title"],
-                    "source": result["source"]
-                })
+            if any(
+                keyword in result["url"].lower()
+                for keyword in ["book", "ticket", "reservation"]
+            ):
+                booking_links.append(
+                    {
+                        "url": result["url"],
+                        "title": result["title"],
+                        "source": result["source"],
+                    }
+                )
         return booking_links

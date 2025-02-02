@@ -8,6 +8,7 @@ from models.costs import Cost
 from models.health import Health
 from models.vehicle import CarSpecifications, TransportCosts
 
+
 class TransportationType(str, Enum):
     CAR = "car"
     BUS = "bus"
@@ -16,6 +17,7 @@ class TransportationType(str, Enum):
     BICYCLE = "bicycle"
     FERRY = "ferry"
     PLANE = "plane"
+
 
 class BudgetRange(BaseModel):
     min_amount: Optional[float] = Field(None, description="Minimum budget amount")
@@ -29,23 +31,39 @@ class BudgetRange(BaseModel):
                 raise ValueError("max_amount must be greater than min_amount")
         return v
 
+
 class OvernightStay(BaseModel):
-    required: bool = Field(default=False, description="Whether overnight stay is required")
-    preferred_accommodation_type: Optional[str] = Field(None, description="Preferred type of accommodation (hotel, hostel, etc.)")
-    max_price_per_night: Optional[float] = Field(None, description="Maximum price per night for accommodation")
+    required: bool = Field(
+        default=False, description="Whether overnight stay is required"
+    )
+    preferred_accommodation_type: Optional[str] = Field(
+        None, description="Preferred type of accommodation (hotel, hostel, etc.)"
+    )
+    max_price_per_night: Optional[float] = Field(
+        None, description="Maximum price per night for accommodation"
+    )
+
 
 class TravelRequest(BaseModel):
     origin: str = Field(..., description="Starting location (city or address)")
     destination: str = Field(..., description="Destination location (city or address)")
-    transportation_type: TransportationType = Field(..., description="Type of transportation")
-    
+    transportation_type: TransportationType = Field(
+        ..., description="Type of transportation"
+    )
+
     # Car specific details
-    car_specifications: Optional[CarSpecifications] = Field(None, description="Car specifications if traveling by car")
-    
+    car_specifications: Optional[CarSpecifications] = Field(
+        None, description="Car specifications if traveling by car"
+    )
+
     # Public transport preferences
-    prefer_direct_routes: Optional[bool] = Field(True, description="Prefer direct routes over transfers")
-    max_transfers: Optional[int] = Field(None, description="Maximum number of transfers for public transport")
-    
+    prefer_direct_routes: Optional[bool] = Field(
+        True, description="Prefer direct routes over transfers"
+    )
+    max_transfers: Optional[int] = Field(
+        None, description="Maximum number of transfers for public transport"
+    )
+
     # Common details
     passengers: int = Field(default=1, ge=1, le=10, description="Number of passengers")
     budget: Optional[BudgetRange] = None
@@ -69,21 +87,18 @@ class TravelRequest(BaseModel):
                     "model": "Toyota Camry",
                     "fuel_consumption": 7.5,
                     "fuel_type": "gasoline",
-                    "tank_capacity": 60
+                    "tank_capacity": 60,
                 },
                 "passengers": 2,
-                "budget": {
-                    "min_amount": 1000,
-                    "max_amount": 2000,
-                    "currency": "USD"
-                },
+                "budget": {"min_amount": 1000, "max_amount": 2000, "currency": "USD"},
                 "overnight_stay": {
                     "required": False,
                     "preferred_accommodation_type": "hotel",
-                    "max_price_per_night": 100
-                }
+                    "max_price_per_night": 100,
+                },
             }
         }
+
 
 class TravelResponse(BaseModel):
     route: Route

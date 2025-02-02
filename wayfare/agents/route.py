@@ -1,6 +1,7 @@
 from typing import Dict, Any, List
 from agents.base import BaseAgent, AgentResponse
 
+
 class RouteAgent(BaseAgent):
     def _setup_chain(self):
         template = """
@@ -17,25 +18,21 @@ class RouteAgent(BaseAgent):
         self.chain = self._create_chain(
             template=template,
             input_variables=[
-                "start_point", "end_point", "transportation_type",
-                "waypoints", "time_constraints", "preferences"
-            ]
+                "start_point",
+                "end_point",
+                "transportation_type",
+                "waypoints",
+                "time_constraints",
+                "preferences",
+            ],
         )
 
     async def process(self, **kwargs) -> Dict[str, Any]:
         try:
             route_data = await self._plan_route(**kwargs)
-            return AgentResponse(
-                success=True,
-                data=route_data,
-                error=None
-            ).to_dict()
+            return AgentResponse(success=True, data=route_data, error=None).to_dict()
         except Exception as e:
-            return AgentResponse(
-                success=False,
-                data={},
-                error=str(e)
-            ).to_dict()
+            return AgentResponse(success=False, data={}, error=str(e)).to_dict()
 
     async def _plan_route(self, **kwargs) -> Dict[str, Any]:
         # Implement actual route planning logic here
@@ -45,14 +42,12 @@ class RouteAgent(BaseAgent):
                 "segments": [],
                 "total_distance": 0,
                 "total_duration": 0,
-                "optimal_stops": []
+                "optimal_stops": [],
             }
         }
 
     async def optimize_route(
-        self,
-        route: Dict[str, Any],
-        constraints: Dict[str, Any]
+        self, route: Dict[str, Any], constraints: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Optimize route based on given constraints."""
         # Implement route optimization logic

@@ -9,7 +9,7 @@ from models.base import GeoLocation, PlaceDetails, SearchResult
 
 class BaseRepository(ABC):
     """Base class for all repositories with common LangChain integration."""
-    
+
     def __init__(self, api_key: str, model_name: str = "gpt-3.5-turbo"):
         self.api_key = api_key
         self.llm = ChatOpenAI(model_name=model_name)
@@ -27,8 +27,8 @@ class BaseRepository(ABC):
                 {content}
                 Extract key details like names, addresses, prices, and amenities.
                 Format the output as a JSON object.
-                """
-            )
+                """,
+            ),
         )
 
     @abstractmethod
@@ -36,7 +36,7 @@ class BaseRepository(ABC):
         self,
         query: str,
         location: Optional[GeoLocation] = None,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
     ) -> SearchResult:
         """Search for places/accommodations."""
         pass
@@ -66,7 +66,7 @@ class BaseMapsRepository(BaseRepository):
         origin: GeoLocation,
         destination: GeoLocation,
         waypoints: Optional[List[GeoLocation]] = None,
-        mode: str = "driving"
+        mode: str = "driving",
     ) -> Dict[str, Any]:
         """Get route between points."""
         pass
@@ -77,21 +77,14 @@ class BaseAccommodationRepository(BaseRepository):
 
     @abstractmethod
     async def check_availability(
-        self,
-        item_id: str,
-        check_in: str,
-        check_out: str,
-        guests: int = 1
+        self, item_id: str, check_in: str, check_out: str, guests: int = 1
     ) -> Dict[str, Any]:
         """Check accommodation availability."""
         pass
 
     @abstractmethod
     async def get_reviews(
-        self,
-        item_id: str,
-        page: int = 1,
-        limit: int = 10
+        self, item_id: str, page: int = 1, limit: int = 10
     ) -> Dict[str, Any]:
         """Get accommodation reviews."""
         pass

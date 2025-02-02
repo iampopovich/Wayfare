@@ -25,3 +25,4 @@ polyline>=2.0.1
 google-api-python-client>=2.114.0
 python-multipart>=0.0.6
 duckduckgo-search
+black
