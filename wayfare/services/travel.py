@@ -53,6 +53,8 @@ class TravelService:
         request: TravelRequest
     ) -> TransportCosts:
         """Calculate transport costs based on mode and distance."""
+        logger.info(f"Calculating costs for {transport_type}, distance={distance_meters/1000:.1f}km, duration={duration_minutes:.0f}min")
+        
         costs = TransportCosts(total_cost=0, currency="USD")
         
         # Basic food and water costs for long trips (over 2 hours)
@@ -118,6 +120,7 @@ class TravelService:
         if costs.accommodation_cost:
             costs.total_cost += costs.accommodation_cost
             
+        logger.info(f"Calculated costs: {costs}")
         return costs
 
     async def _find_gas_stations_along_route(
@@ -126,10 +129,12 @@ class TravelService:
         search_radius_meters: int = 5000
     ) -> List[dict]:
         """Find gas stations near route points using OpenStreetMap Overpass API."""
+        logger.info(f"Finding gas stations along {len(route_points)} route points")
         gas_stations = []
         
         async with aiohttp.ClientSession() as session:
-            for lat, lon in route_points:
+            for i, (lat, lon) in enumerate(route_points):
+                logger.info(f"Searching for gas stations near point {i+1}/{len(route_points)}")
                 # Overpass query to find gas stations within radius
                 query = f"""
                 [out:json][timeout:25];
@@ -159,12 +164,14 @@ class TravelService:
                                     'brand': element.get('tags', {}).get('brand', 'Unknown'),
                                     'amenities': ['fuel', 'rest_stop']
                                 })
+                            logger.info(f"Found {len(data.get('elements', []))} stations near point {i+1}")
                 except Exception as e:
-                    print(f"Error fetching gas stations: {e}")
+                    logger.warning(f"Failed to find gas stations near point {i+1}: {str(e)}")
                 
                 # Rate limiting to be nice to the API
                 await asyncio.sleep(1)
         
+        logger.info(f"Found total of {len(gas_stations)} gas stations")
         return gas_stations
 
     async def _calculate_optimal_stops(
@@ -176,6 +183,7 @@ class TravelService:
         request: TravelRequest
     ) -> List[dict]:
         """Calculate optimal stops based on fuel range, rest requirements, and current fuel level."""
+        logger.info("Calculating optimal stops")
         stops = []
         
         # Calculate vehicle range with current load
@@ -280,11 +288,17 @@ class TravelService:
                 current_distance += segment_distance
                 time_since_rest += segment_time
         
+        logger.info(f"Calculated {len(stops)} stops")
         return stops
 
     async def plan_travel(self, request: TravelRequest) -> TravelResponse:
         """Plan a travel route with all necessary details using Google Maps."""
         try:
+            logger.info(f"Planning travel from {request.origin} to {request.destination}")
+            logger.info(f"Transportation type: {request.transportation_type}")
+            if request.car_specifications:
+                logger.info(f"Car specs: {request.car_specifications}")
+            
             # First, geocode the origin and destination
             logger.info(f"Geocoding locations: {request.origin} -> {request.destination}")
             
@@ -298,11 +312,13 @@ class TravelService:
             logger.info(f"Using Google Maps travel mode: {mode}")
 
             # Get route from Google Maps
+            logger.info("Requesting route from Google Maps")
             route = await self.maps_repository.get_directions(
                 origin=origin_location,
                 destination=destination_location,
                 mode=mode
             )
+            logger.info(f"Received route with {len(route.segments)} segments")
 
             # Extract route points for gas station search
             route_points = []
@@ -322,44 +338,57 @@ class TravelService:
                     route.segments[-1].end_location.longitude
                 ))
             
+            logger.info(f"Total route distance: {total_distance_km:.1f}km")
+            logger.info(f"Extracted {len(route_points)} route points")
+            
             # Find gas stations along route
+            logger.info("Searching for gas stations along route")
             gas_stations = await self._find_gas_stations_along_route(route_points)
+            logger.info(f"Found {len(gas_stations)} gas stations along route")
             
             # Temporarily disable stop calculations
             stops = []
             
             # Calculate transport costs
+            logger.info("Calculating transport costs")
             costs = await self._calculate_transport_costs(
                 sum(segment.distance for segment in route.segments),
-                sum(segment.duration for segment in route.segments),
+                sum(segment.duration for segment in route_segments),
                 request.transportation_type,
                 request
             )
-
+            logger.info(f"Calculated costs: {costs}")
+            
             # Calculate health metrics
+            logger.info("Calculating health impact")
             health = Health(
                 total_calories=self._calculate_calories(
                     sum(segment.distance for segment in route.segments),
                     request.transportation_type
                 ),
                 activity_breakdown={
-                    request.transportation_type.value: sum(segment.distance for segment in route.segments) * 0.1
+                    request.transportation_type.value: sum(segment.distance for segment in route_segments) * 0.1
                 }
             )
-
-            return TravelResponse(
+            logger.info(f"Calculated health impact: {health}")
+            
+            response = TravelResponse(
                 route=route,
                 stops=stops,
                 costs=costs,
                 health=health
             )
-
+            logger.info("Travel plan completed successfully")
+            return response
+            
         except Exception as e:
             logger.error(f"Error in plan_travel: {str(e)}", exc_info=True)
             raise ValueError(f"Failed to plan travel: {str(e)}")
 
     def _calculate_calories(self, distance_meters: float, transport_type: TransportationType) -> float:
         """Calculate calories burned during travel."""
+        logger.info(f"Calculating calories for {transport_type}, distance={distance_meters/1000:.1f}km")
+        
         # Simple calorie calculation
         base_rate = {
             TransportationType.CAR: 0.1,     # Very low for driving
@@ -370,4 +399,6 @@ class TravelService:
         }.get(transport_type, 0.1)  # Default to car rate
 
         kilometers = distance_meters / 1000
-        return round(base_rate * kilometers, 2)
+        calories = round(base_rate * kilometers, 2)
+        logger.info(f"Calculated calories: {calories}")
+        return calories

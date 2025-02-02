@@ -11,30 +11,43 @@ logger = logging.getLogger(__name__)
 class GoogleMapsRepository:
     def __init__(self, api_key: str):
         """Initialize Google Maps client."""
+        logger.info("Initializing Google Maps client")
         self.client = googlemaps.Client(key=api_key)
 
     async def geocode(self, address: str) -> GeoLocation:
         """Convert address to coordinates using Google Maps API."""
+        logger.info(f"Geocoding address: {address}")
         result = self.client.geocode(address)
         if not result:
+            logger.error(f"No geocoding results found for address: {address}")
             raise ValueError(f"No results found for address: {address}")
         
         location = result[0]['geometry']['location']
-        return GeoLocation(
+        geo_location = GeoLocation(
             latitude=location['lat'],
             longitude=location['lng'],
             address=result[0]['formatted_address']
         )
+        logger.info(f"Geocoded {address} to: lat={geo_location.latitude}, lng={geo_location.longitude}, address='{geo_location.address}'")
+        return geo_location
 
     async def reverse_geocode(self, location: GeoLocation) -> str:
         """Convert coordinates to address using Google Maps API."""
+        logger.info(f"Reverse geocoding location: lat={location.latitude}, lng={location.longitude}")
         result = self.client.reverse_geocode((location.latitude, location.longitude))
         if not result:
+            logger.error(f"No reverse geocoding results found for location: {location}")
             raise ValueError(f"No results found for location: {location}")
-        return result[0]['formatted_address']
+        address = result[0]['formatted_address']
+        logger.info(f"Reverse geocoded to address: {address}")
+        return address
 
     async def search_places(self, query: str, location: Optional[Location] = None, radius: Optional[int] = None) -> List[Dict[str, Any]]:
         """Search for places using Google Maps Places API."""
+        logger.info(f"Searching places with query: {query}")
+        if location:
+            logger.info(f"Location bias: lat={location.latitude}, lng={location.longitude}, radius={radius}m")
+        
         location_bias = None
         if location and radius:
             location_bias = {
@@ -47,12 +60,17 @@ class GoogleMapsRepository:
             location=location_bias["location"] if location_bias else None,
             radius=radius
         )
-        return result.get("results", [])
+        places = result.get("results", [])
+        logger.info(f"Found {len(places)} places matching query: {query}")
+        return places
 
     async def get_place_details(self, place_id: str) -> Dict[str, Any]:
         """Get detailed information about a specific place."""
+        logger.info(f"Getting place details for place_id: {place_id}")
         result = self.client.place(place_id)
-        return result.get("result", {})
+        place_details = result.get("result", {})
+        logger.info(f"Got place details for place_id: {place_id}")
+        return place_details
 
     async def get_directions(
         self,
@@ -80,6 +98,7 @@ class GoogleMapsRepository:
             )
 
             if not result:
+                logger.error(f"No route found between {origin} and {destination}")
                 raise ValueError(f"No route found between {origin} and {destination}")
 
             # Get the first (usually optimal) route
@@ -117,12 +136,16 @@ class GoogleMapsRepository:
                 total_distance += leg["distance"]["value"]
                 total_duration += leg["duration"]["value"]
 
-            return Route(
+            route_data = Route(
                 segments=segments,
                 total_distance=total_distance,
                 total_duration=total_duration / 60,  # Convert to minutes
                 path_points=path_points
             )
+            logger.info(f"Route found: {len(segments)} segments, "
+                       f"distance={route_data.total_distance/1000:.1f}km, "
+                       f"duration={route_data.total_duration:.0f}min")
+            return route_data
 
         except Exception as e:
             logger.error(f"Error getting directions: {str(e)}", exc_info=True)
@@ -135,6 +158,10 @@ class GoogleMapsRepository:
         filters: Optional[Dict[str, Any]] = None
     ) -> SearchResult:
         """Search for places using Google Maps API."""
+        logger.info(f"Searching places with query: {query}")
+        if location:
+            logger.info(f"Location bias: lat={location.latitude}, lng={location.longitude}")
+        
         places_results = self.client.places(
             query,
             location=(location.latitude, location.longitude) if location else None,
@@ -154,6 +181,7 @@ class GoogleMapsRepository:
                 photos=[photo['photo_reference'] for photo in place.get('photos', [])]
             ))
 
+        logger.info(f"Found {len(items)} places matching query: {query}")
         return SearchResult(
             items=items,
             total_count=len(items),
@@ -162,9 +190,10 @@ class GoogleMapsRepository:
 
     async def get_details(self, item_id: str) -> PlaceDetails:
         """Get detailed information about a specific place."""
+        logger.info(f"Getting place details for place_id: {item_id}")
         place = self.client.place(item_id)
         
-        return PlaceDetails(
+        place_details = PlaceDetails(
             id=place['place_id'],
             name=place['name'],
             location=GeoLocation(
@@ -182,3 +211,5 @@ class GoogleMapsRepository:
                 'opening_hours': place.get('opening_hours', {}).get('weekday_text', [])
             }
         )
+        logger.info(f"Got place details for place_id: {item_id}")
+        return place_details
