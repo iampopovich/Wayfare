@@ -94,11 +94,12 @@ async def api_welcome():
         "openapi": "/openapi.json"
     })
 
-    
+PORT = int(os.getenv('PORT', 8000))
+
 if __name__ == "__main__":
     uvicorn.run(
         "wayfare.main:app",
         host="0.0.0.0",
-        port=8000,
+        port=PORT,
         reload=True
     )
