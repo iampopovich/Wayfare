@@ -1,26 +1,13 @@
-from typing import List, Optional, Dict, Any
+from typing import Optional, List, Dict, Any
 import googlemaps
-from langchain.tools import GooglePlacesTool
-from langchain.agents import AgentType, initialize_agent
-from langchain_openai import ChatOpenAI
-
-from wayfare.repositories.base import BaseMapsRepository
 from wayfare.models.base import GeoLocation, PlaceDetails, SearchResult
+from wayfare.models.location import Location
+from wayfare.models.route import Route, RouteSegment
 
-
-class GoogleMapsRepository(BaseMapsRepository):
-    def __init__(self, api_key: str, model_name: str = "gpt-3.5-turbo"):
-        super().__init__(api_key, model_name)
+class GoogleMapsRepository:
+    def __init__(self, api_key: str):
+        """Initialize Google Maps client."""
         self.client = googlemaps.Client(key=api_key)
-        
-        # Setup LangChain tools and agent
-        places_tool = GooglePlacesTool(api_key=api_key)
-        self.agent = initialize_agent(
-            tools=[places_tool],
-            llm=ChatOpenAI(model_name=model_name),
-            agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-            verbose=True
-        )
 
     async def geocode(self, address: str) -> GeoLocation:
         """Convert address to coordinates using Google Maps API."""
@@ -42,34 +29,82 @@ class GoogleMapsRepository(BaseMapsRepository):
             raise ValueError(f"No results found for location: {location}")
         return result[0]['formatted_address']
 
-    async def get_route(
+    async def search_places(self, query: str, location: Optional[Location] = None, radius: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Search for places using Google Maps Places API."""
+        location_bias = None
+        if location and radius:
+            location_bias = {
+                "location": {"lat": location.latitude, "lng": location.longitude},
+                "radius": radius
+            }
+
+        result = self.client.places(
+            query,
+            location=location_bias["location"] if location_bias else None,
+            radius=radius
+        )
+        return result.get("results", [])
+
+    async def get_place_details(self, place_id: str) -> Dict[str, Any]:
+        """Get detailed information about a specific place."""
+        result = self.client.place(place_id)
+        return result.get("result", {})
+
+    async def get_directions(
         self,
-        origin: GeoLocation,
-        destination: GeoLocation,
-        waypoints: Optional[List[GeoLocation]] = None,
-        mode: str = "driving"
-    ) -> Dict[str, Any]:
-        """Get route between points using Google Maps API."""
-        waypoints_coords = None
+        origin: Location,
+        destination: Location,
+        mode: str = "driving",
+        waypoints: Optional[List[Location]] = None
+    ) -> Route:
+        """Get directions between two points."""
+        waypoints_list = None
         if waypoints:
-            waypoints_coords = [(w.latitude, w.longitude) for w in waypoints]
+            waypoints_list = [f"{w.latitude},{w.longitude}" for w in waypoints]
 
         result = self.client.directions(
-            origin=(origin.latitude, origin.longitude),
-            destination=(destination.latitude, destination.longitude),
+            origin=f"{origin.latitude},{origin.longitude}",
+            destination=f"{destination.latitude},{destination.longitude}",
             mode=mode,
-            waypoints=waypoints_coords
+            waypoints=waypoints_list
         )
 
         if not result:
             raise ValueError("No route found")
 
-        return {
-            "distance": result[0]['legs'][0]['distance']['value'],
-            "duration": result[0]['legs'][0]['duration']['value'],
-            "steps": result[0]['legs'][0]['steps'],
-            "polyline": result[0]['overview_polyline']['points']
-        }
+        route = result[0]
+        legs = route["legs"]
+
+        segments = []
+        total_distance = 0
+        total_duration = 0
+
+        for leg in legs:
+            segment = RouteSegment(
+                start_location=Location(
+                    latitude=leg["start_location"]["lat"],
+                    longitude=leg["start_location"]["lng"]
+                ),
+                end_location=Location(
+                    latitude=leg["end_location"]["lat"],
+                    longitude=leg["end_location"]["lng"]
+                ),
+                distance=leg["distance"]["value"],
+                duration=leg["duration"]["value"] / 60,  # Convert to minutes
+                polyline=leg.get("steps", [{}])[0].get("polyline", {}).get("points", ""),
+                instructions=[step["html_instructions"] for step in leg.get("steps", [])]
+            )
+            segments.append(segment)
+            total_distance += leg["distance"]["value"]
+            total_duration += leg["duration"]["value"]
+
+        return Route(
+            segments=segments,
+            total_distance=total_distance,
+            total_duration=total_duration / 60,  # Convert to minutes
+            overview_polyline=route.get("overview_polyline", {}).get("points", ""),
+            bounds=route.get("bounds", {})
+        )
 
     async def search(
         self,
@@ -77,17 +112,7 @@ class GoogleMapsRepository(BaseMapsRepository):
         location: Optional[GeoLocation] = None,
         filters: Optional[Dict[str, Any]] = None
     ) -> SearchResult:
-        """Search for places using Google Maps API and LangChain agent."""
-        # Use LangChain agent for enhanced search capabilities
-        agent_query = f"Find places matching '{query}'"
-        if location:
-            agent_query += f" near {location.latitude}, {location.longitude}"
-        if filters:
-            agent_query += f" with filters: {filters}"
-
-        agent_result = await self.agent.arun(agent_query)
-        
-        # Process agent results and convert to SearchResult
+        """Search for places using Google Maps API."""
         places_results = self.client.places(
             query,
             location=(location.latitude, location.longitude) if location else None,

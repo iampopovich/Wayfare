@@ -1,0 +1,148 @@
+/* General Styles */
+body {
+    background-color: #f8f9fa;
+}
+
+.navbar {
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border: none;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.card-title {
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+/* Form Styles */
+.form-label {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.form-control, .form-select {
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+    padding: 0.625rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 0.2rem rgba(74, 144, 226, 0.25);
+}
+
+/* Map Styles */
+#map {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Tab Styles */
+.nav-tabs {
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.nav-tabs .nav-link {
+    color: #6c757d;
+    font-weight: 500;
+    border: none;
+    padding: 0.75rem 1rem;
+}
+
+.nav-tabs .nav-link:hover {
+    color: #4a90e2;
+    border: none;
+    border-bottom: 2px solid #4a90e2;
+}
+
+.nav-tabs .nav-link.active {
+    color: #4a90e2;
+    background: none;
+    border: none;
+    border-bottom: 2px solid #4a90e2;
+}
+
+/* Results Styles */
+.result-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #4a90e2;
+}
+
+.result-title {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.result-detail {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* Cost Breakdown Styles */
+.cost-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.cost-label {
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+.cost-value {
+    color: #4a90e2;
+    font-weight: 600;
+}
+
+/* Health Stats Styles */
+.health-stat {
+    text-align: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.health-stat-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #4a90e2;
+}
+
+.health-stat-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 1rem;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    #map {
+        height: 300px;
+    }
+    
+    .nav-tabs .nav-link {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+}

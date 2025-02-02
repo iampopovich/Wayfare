@@ -1,32 +1,27 @@
 from functools import lru_cache
-from typing import Optional
+from fastapi import Depends
 
-from wayfare.services.maps import MapsService
+from wayfare.config import get_settings
 from wayfare.services.travel import TravelService
-from wayfare.core.settings import settings
+from wayfare.services.maps import MapsService
+from wayfare.repositories.maps.google_maps import GoogleMapsRepository
 
 # Load environment variables
 # load_dotenv()
 
 @lru_cache()
-def get_maps_service() -> MapsService:
-    """
-    Create and cache MapsService instance.
-    """
-    return MapsService(
-        google_maps_key=settings.GOOGLE_MAPS_API_KEY,
-        mapsme_key=settings.MAPSME_API_KEY,
-        model_name=settings.OPENAI_MODEL_NAME
-    )
+def get_maps_repository() -> GoogleMapsRepository:
+    settings = get_settings()
+    return GoogleMapsRepository(api_key=settings.GOOGLE_MAPS_API_KEY)
 
 @lru_cache()
-def get_travel_service() -> TravelService:
-    """
-    Create and cache TravelService instance.
-    """
-    return TravelService(
-        booking_key=settings.BOOKING_API_KEY,
-        trip_key=settings.TRIP_API_KEY,
-        airbnb_key=settings.AIRBNB_API_KEY,
-        model_name=settings.OPENAI_MODEL_NAME
-    )
+def get_maps_service(
+    maps_repository: GoogleMapsRepository = Depends(get_maps_repository)
+) -> MapsService:
+    return MapsService(maps_repository=maps_repository)
+
+@lru_cache()
+def get_travel_service(
+    maps_repository: GoogleMapsRepository = Depends(get_maps_repository)
+) -> TravelService:
+    return TravelService(maps_repository=maps_repository)
