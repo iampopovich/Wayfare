@@ -45,5 +45,5 @@ def get_travel_service(
     return TravelService(
         maps_repository=maps_repository,
         weather_repository=weather_repository,
-        search_service=search_service
+        search_service=search_service,
     )

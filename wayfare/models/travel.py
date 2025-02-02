@@ -105,4 +105,6 @@ class TravelResponse(BaseModel):
     stops: List[Stop]
     costs: TransportCosts
     health: Health
-    weather: Optional[dict] = Field(None, description="Weather data for origin and destination")
+    weather: Optional[dict] = Field(
+        None, description="Weather data for origin and destination"
+    )

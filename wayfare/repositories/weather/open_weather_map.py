@@ -5,6 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class WeatherRepository:
     """Repository for interacting with Open-Meteo Weather API."""
 
@@ -18,7 +19,7 @@ class WeatherRepository:
             "longitude": longitude,
             "current": "temperature_2m,wind_speed_10m",
             "hourly": "temperature_2m,relative_humidity_2m,wind_speed_10m",
-            "timezone": "auto"
+            "timezone": "auto",
         }
 
         logger.info(f"Fetching weather data for lat={latitude}, lon={longitude}")
@@ -38,12 +39,14 @@ class WeatherRepository:
         # Get current time index from hourly data
         current_time = datetime.fromisoformat(current.get("time", ""))
         hourly_times = [datetime.fromisoformat(t) for t in hourly.get("time", [])]
-        
+
         try:
             current_index = hourly_times.index(current_time)
         except ValueError:
             current_index = 0
-            logger.warning(f"Could not find current time {current_time} in hourly data, using index 0")
+            logger.warning(
+                f"Could not find current time {current_time} in hourly data, using index 0"
+            )
 
         # Get next 24 hours of data
         next_24h = slice(current_index, current_index + 24)
@@ -52,14 +55,14 @@ class WeatherRepository:
             "current": {
                 "temperature": current.get("temperature_2m"),
                 "wind_speed": current.get("wind_speed_10m"),
-                "time": current.get("time")
+                "time": current.get("time"),
             },
             "forecast": {
                 "times": hourly.get("time", [])[next_24h],
                 "temperatures": hourly.get("temperature_2m", [])[next_24h],
                 "humidity": hourly.get("relative_humidity_2m", [])[next_24h],
-                "wind_speed": hourly.get("wind_speed_10m", [])[next_24h]
-            }
+                "wind_speed": hourly.get("wind_speed_10m", [])[next_24h],
+            },
         }
         logger.info(f"Parsed weather data: {parsed_data}")
         return parsed_data

@@ -5,6 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class WeatherAgent(BaseAgent):
     """Agent for getting weather information for route points."""
 
@@ -34,14 +35,12 @@ class WeatherAgent(BaseAgent):
             logger.info(f"Getting weather for start location: {start_location}")
             # Get weather data for both locations
             start_weather = await self.weather_repository.get_weather(
-                start_location["latitude"],
-                start_location["longitude"]
+                start_location["latitude"], start_location["longitude"]
             )
 
             logger.info(f"Getting weather for end location: {end_location}")
             end_weather = await self.weather_repository.get_weather(
-                end_location["latitude"],
-                end_location["longitude"]
+                end_location["latitude"], end_location["longitude"]
             )
 
             # Parse weather data
@@ -49,40 +48,36 @@ class WeatherAgent(BaseAgent):
             weather_data = {
                 "origin": {
                     "location": start_location["address"],
-                    "weather": self.weather_repository.parse_weather_data(start_weather)
+                    "weather": self.weather_repository.parse_weather_data(
+                        start_weather
+                    ),
                 },
                 "destination": {
                     "location": end_location["address"],
-                    "weather": self.weather_repository.parse_weather_data(end_weather)
-                }
+                    "weather": self.weather_repository.parse_weather_data(end_weather),
+                },
             }
 
             # Add weather alerts and recommendations
-            weather_data["recommendations"] = self._generate_recommendations(weather_data)
+            weather_data["recommendations"] = self._generate_recommendations(
+                weather_data
+            )
             logger.info(f"Generated weather data with recommendations: {weather_data}")
 
-            return AgentResponse(
-                success=True,
-                data=weather_data,
-                error=None
-            ).to_dict()
+            return AgentResponse(success=True, data=weather_data, error=None).to_dict()
 
         except Exception as e:
             logger.error(f"Error processing weather data: {str(e)}", exc_info=True)
-            return AgentResponse(
-                success=False,
-                data={},
-                error=str(e)
-            ).to_dict()
+            return AgentResponse(success=False, data={}, error=str(e)).to_dict()
 
     def _generate_recommendations(self, weather_data: Dict[str, Any]) -> list[str]:
         """Generate weather-based recommendations."""
         recommendations = []
-        
+
         # Check temperature differences
         origin_temp = weather_data["origin"]["weather"]["current"]["temperature"]
         dest_temp = weather_data["destination"]["weather"]["current"]["temperature"]
-        
+
         if abs(origin_temp - dest_temp) > 10:
             recommendations.append(
                 f"Temperature difference of {abs(origin_temp - dest_temp):.1f}°C between origin and destination. "

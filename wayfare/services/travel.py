@@ -33,10 +33,10 @@ class TravelService:
     }
 
     def __init__(
-        self, 
-        maps_repository: GoogleMapsRepository, 
-        weather_repository: WeatherRepository, 
-        search_service: SearchService
+        self,
+        maps_repository: GoogleMapsRepository,
+        weather_repository: WeatherRepository,
+        search_service: SearchService,
     ):
         self.maps_repository = maps_repository
         self.weather_repository = weather_repository
@@ -449,23 +449,31 @@ class TravelService:
                         "start_location": {
                             "latitude": segment.start_location.latitude,
                             "longitude": segment.start_location.longitude,
-                            "address": segment.start_location.address
+                            "address": segment.start_location.address,
                         },
                         "end_location": {
                             "latitude": segment.end_location.latitude,
                             "longitude": segment.end_location.longitude,
-                            "address": segment.end_location.address
-                        }
+                            "address": segment.end_location.address,
+                        },
                     }
                     for segment in route.segments
                 ]
             }
             weather_response = await self.weather_agent.process(route=route_dict)
-            weather_data = weather_response.get('data', {}) if weather_response.get('success') else {}
+            weather_data = (
+                weather_response.get("data", {})
+                if weather_response.get("success")
+                else {}
+            )
             logger.info(f"Calculated weather data: {weather_data}")
 
             response = TravelResponse(
-                route=route, stops=stops, costs=costs, health=health, weather=weather_data
+                route=route,
+                stops=stops,
+                costs=costs,
+                health=health,
+                weather=weather_data,
             )
             logger.info("Travel plan completed successfully")
             return response
