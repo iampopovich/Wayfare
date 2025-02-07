@@ -359,49 +359,21 @@ class TravelService:
                         ],
                         "gas_stations": gas_stations,
                     },
-                    transportation_type=request.transportation_type.value,
+                    transportation_type=request.transportation_type.value.lower(),
                     conditions={
                         "vehicle_specifications": vehicle_specs,
-                        "passengers": request.passengers,
+                        "weather": {},  # Add weather conditions if needed
+                        "traffic": {},   # Add traffic conditions if needed
                     },
-                    time_constraints={
-                        "max_driving_time": 180 if request.transportation_type == TransportationType.MOTORCYCLE else 240,  # 3 hours for motorcycle, 4 for car
-                        "min_rest_time": 45 if request.transportation_type == TransportationType.MOTORCYCLE else 30,  # 45 minutes for motorcycle, 30 for car
-                    },
+                    time_constraints={},
                     required_stops=["fuel", "rest"],
                 )
 
                 if agent_response["success"]:
-                    logger.info("Successfully calculated stops with StopsAgent")
                     stops = agent_response["data"]["planned_stops"]
-                    total_duration = agent_response["data"]["timing"]["total_duration"]
-
-                    # Update route total duration to include stops
-                    route.total_duration = total_duration
-
-                    # Add stops to route segments
-                    for stop in stops:
-                        # Find the segment where this stop belongs
-                        stop_distance = stop["distance_from_start"]
-                        current_distance = 0
-
-                        for segment in route.segments:
-                            segment_distance = segment.distance / 1000  # Convert to km
-                            if (
-                                current_distance
-                                <= stop_distance
-                                < current_distance + segment_distance
-                            ):
-                                # This stop belongs to this segment
-                                if not hasattr(segment, "stops"):
-                                    segment.stops = []
-                                segment.stops.append(stop)
-                                break
-                            current_distance += segment_distance
+                    logger.info(f"StopsAgent planned {len(stops)} stops")
                 else:
-                    logger.error(
-                        f"Failed to calculate stops: {agent_response['error']}"
-                    )
+                    logger.error(f"StopsAgent failed: {agent_response['error']}")
 
             # Calculate transport costs
             logger.info("Calculating transport costs")
