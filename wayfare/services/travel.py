@@ -100,7 +100,15 @@ class TravelService:
             # Calculate car-specific costs
             specs = request.car_specifications
             fuel_consumption = (distance_km / 100) * specs.fuel_consumption
-            fuel_price = await self.fuel_agent.get_fuel_price(specs.fuel_type) or self.FUEL_PRICES.get(specs.fuel_type, 1.2)
+            
+            # Get fuel price from agent or use default
+            agent_response = await self.fuel_agent.process(
+                fuel_type=specs.fuel_type,
+                region="default"  # You can specify region if needed
+            )
+            fuel_price = self.FUEL_PRICES.get(specs.fuel_type, 1.2)
+            if agent_response["success"]:
+                fuel_price = agent_response["data"].get("price_per_liter", fuel_price)
             
             costs.fuel_consumption = fuel_consumption
             costs.fuel_cost = fuel_consumption * fuel_price
@@ -120,7 +128,15 @@ class TravelService:
             specs = request.motorcycle_specifications
             # Convert km/L to total liters needed
             fuel_consumption = distance_km / specs.fuel_economy
-            fuel_price = await self.fuel_agent.get_fuel_price(specs.fuel_type) or self.FUEL_PRICES.get(specs.fuel_type, 1.1)
+            
+            # Get fuel price from agent or use default
+            agent_response = await self.fuel_agent.process(
+                fuel_type=specs.fuel_type,
+                region="default"  # You can specify region if needed
+            )
+            fuel_price = self.FUEL_PRICES.get(specs.fuel_type, 1.1)
+            if agent_response["success"]:
+                fuel_price = agent_response["data"].get("price_per_liter", fuel_price)
             
             costs.fuel_consumption = fuel_consumption
             costs.fuel_cost = fuel_consumption * fuel_price

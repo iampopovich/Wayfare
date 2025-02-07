@@ -55,10 +55,14 @@ document.getElementById('tripForm').addEventListener('submit', async function(e)
         }
     };
 
-    // Add vehicle specifications if transport type is car or motorcycle
+    // Add vehicle specifications based on transport type
     const vehicleSpecs = vehicleFormManager.getVehicleSpecifications();
     if (vehicleSpecs) {
-        formData.vehicle_specifications = vehicleSpecs;
+        if (transportationType === 'motorcycle') {
+            formData.motorcycle_specifications = vehicleSpecs;
+        } else if (transportationType === 'car') {
+            formData.car_specifications = vehicleSpecs;
+        }
     }
 
     try {
@@ -107,11 +111,17 @@ function displayResults(data) {
         if (data.stops) displayStopsDetails(data.stops);
         if (data.accommodation) displayAccommodationDetails(data.accommodation);
         if (data.weather) displayWeatherDetails(data.weather);
-        if (data.costs) displayCostDetails(data.costs);
+        if (data.costs && typeof data.costs === 'object') displayCostDetails(data.costs);
         if (data.health) displayHealthDetails(data.health);
         
         // Show the results container
         document.getElementById('resultsContainer').classList.remove('d-none');
+        
+        // Show share button if we have a valid route
+        const shareButton = document.getElementById('shareRouteButton');
+        if (shareButton) {
+            shareButton.classList.remove('d-none');
+        }
     } catch (error) {
         console.error('Error displaying results:', error);
         showError('Error displaying trip details: ' + error.message);
@@ -339,7 +349,7 @@ function displayCostDetails(costs) {
         if (!container) return;
 
         // Validate costs data
-        if (!costs) {
+        if (!costs || typeof costs !== 'object') {
             container.innerHTML = '<div class="alert alert-warning">Cost information is not available.</div>';
             return;
         }
@@ -357,20 +367,24 @@ function displayCostDetails(costs) {
                     <tbody>
         `;
 
-        // Display fuel costs if present
-        if (costs.fuel_cost) {
+        // Always show fuel costs first if present
+        if (costs.fuel_cost !== undefined && costs.fuel_cost !== null && costs.fuel_consumption) {
+            const pricePerLiter = costs.fuel_cost / costs.fuel_consumption;
             html += `
                 <tr>
                     <td>Fuel</td>
-                    <td>${formatCurrency(costs.fuel_cost, costs.currency)}
-                        ${costs.fuel_consumption ? `<br><small class="text-muted">(${costs.fuel_consumption.toFixed(1)} L)</small>` : ''}
+                    <td>
+                        ${formatCurrency(costs.fuel_cost, costs.currency)}
+                        <br><small class="text-muted">
+                            ${Number(costs.fuel_consumption).toFixed(1)} L × ${formatCurrency(pricePerLiter, costs.currency)}/L
+                        </small>
                     </td>
                 </tr>
             `;
         }
 
-        // Display maintenance costs if present
-        if (costs.maintenance_cost) {
+        // Show maintenance costs if present
+        if (costs.maintenance_cost !== undefined && costs.maintenance_cost !== null) {
             html += `
                 <tr>
                     <td>Maintenance</td>
@@ -379,46 +393,7 @@ function displayCostDetails(costs) {
             `;
         }
 
-        // Display ticket costs for public transport
-        if (costs.ticket_cost) {
-            html += `
-                <tr>
-                    <td>Tickets</td>
-                    <td>${formatCurrency(costs.ticket_cost, costs.currency)}</td>
-                </tr>
-            `;
-        }
-
-        // Display food and water costs if present
-        if (costs.food_cost) {
-            html += `
-                <tr>
-                    <td>Food</td>
-                    <td>${formatCurrency(costs.food_cost, costs.currency)}</td>
-                </tr>
-            `;
-        }
-
-        if (costs.water_cost) {
-            html += `
-                <tr>
-                    <td>Water</td>
-                    <td>${formatCurrency(costs.water_cost, costs.currency)}</td>
-                </tr>
-            `;
-        }
-
-        // Display accommodation costs if present
-        if (costs.accommodation_cost) {
-            html += `
-                <tr>
-                    <td>Accommodation</td>
-                    <td>${formatCurrency(costs.accommodation_cost, costs.currency)}</td>
-                </tr>
-            `;
-        }
-
-        // Display refueling stops if present
+        // Show refueling stops if present
         if (costs.refueling_stops !== undefined && costs.refueling_stops !== null) {
             html += `
                 <tr>
@@ -427,6 +402,21 @@ function displayCostDetails(costs) {
                 </tr>
             `;
         }
+
+        // Show other costs
+        const skipFields = ['fuel_cost', 'maintenance_cost', 'refueling_stops', 'fuel_consumption', 'total_cost', 'currency'];
+        Object.entries(costs).forEach(([field, value]) => {
+            if (!skipFields.includes(field) && value !== null && value !== undefined) {
+                if (typeof value === 'number') {
+                    html += `
+                        <tr>
+                            <td>${field.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}</td>
+                            <td>${formatCurrency(value, costs.currency)}</td>
+                        </tr>
+                    `;
+                }
+            }
+        });
 
         // Always display total cost
         html += `
