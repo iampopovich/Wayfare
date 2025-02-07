@@ -10,6 +10,12 @@ let markersLayer = null;
 // Store the current route data globally
 let currentRouteData = null;
 
+// Import vehicle form manager
+import VehicleFormManager from './js/vehicleForms.js';
+
+// Initialize vehicle form manager
+const vehicleFormManager = new VehicleFormManager();
+
 // Form handling
 document.getElementById('transportationType').addEventListener('change', function(e) {
     const carDetails = document.getElementById('carDetails');
@@ -49,18 +55,10 @@ document.getElementById('tripForm').addEventListener('submit', async function(e)
         }
     };
 
-    // Add car specifications if transport type is car
-    if (formData.transportation_type === 'car') {
-        formData.car_specifications = {
-            model: document.getElementById('carModel').value || 'Standard 1.6L',
-            engine_volume: parseFloat(document.getElementById('engineVolume').value) || 1.6,
-            fuel_consumption: parseFloat(document.getElementById('fuelConsumption').value) || 11.0,
-            fuel_type: document.getElementById('fuelType').value || 'gasoline',
-            tank_capacity: parseFloat(document.getElementById('tankCapacity').value) || 50.0,
-            initial_fuel: parseFloat(document.getElementById('initialFuel').value) || 25.0,
-            base_mass: 1200.0,
-            passenger_mass: 75.0
-        };
+    // Add vehicle specifications if transport type is car or motorcycle
+    const vehicleSpecs = vehicleFormManager.getVehicleSpecifications();
+    if (vehicleSpecs) {
+        formData.vehicle_specifications = vehicleSpecs;
     }
 
     try {
@@ -89,36 +87,35 @@ document.getElementById('tripForm').addEventListener('submit', async function(e)
 });
 
 function displayResults(data) {
-    // Store the route data globally
-    currentRouteData = data;
-    
-    // Clear previous results
-    clearMap();
-    
-    // Display route on map
-    displayRoute(data.route);
-    
-    // Update route details tab
-    displayRouteDetails(data.route);
-    
-    // Update stops tab
-    if (data.stops && data.stops.length > 0) {
-        displayStopsDetails(data.stops);
+    try {
+        // Store the route data globally
+        currentRouteData = data;
+        
+        // Clear previous results
+        clearMap();
+
+        // Make sure we have valid data before proceeding
+        if (!data || !data.route) {
+            throw new Error('Invalid route data received');
+        }
+        
+        // Display route on map
+        displayRoute(data.route);
+        
+        // Update all the details tabs
+        if (data.route) displayRouteDetails(data.route);
+        if (data.stops) displayStopsDetails(data.stops);
+        if (data.accommodation) displayAccommodationDetails(data.accommodation);
+        if (data.weather) displayWeatherDetails(data.weather);
+        if (data.costs) displayCostDetails(data.costs);
+        if (data.health) displayHealthDetails(data.health);
+        
+        // Show the results container
+        document.getElementById('resultsContainer').classList.remove('d-none');
+    } catch (error) {
+        console.error('Error displaying results:', error);
+        showError('Error displaying trip details: ' + error.message);
     }
-    
-    // Update weather tab
-    if (data.weather) {
-        displayWeatherDetails(data.weather);
-    }
-    
-    // Update costs tab
-    displayCostDetails(data.costs);
-    
-    // Update health tab
-    displayHealthDetails(data.health);
-    
-    // Show share button
-    document.getElementById('shareRouteButton').classList.remove('d-none');
 }
 
 function shareRoute() {
@@ -236,122 +233,44 @@ function displayRoute(route) {
     map.fitBounds(bounds, { padding: [50, 50] });
 }
 
-function displayStopsDetails(stops) {
-    console.log('Displaying stops details:', stops);
-    const container = document.getElementById('stopsDetails');
-    
-    if (!stops || stops.length === 0) {
-        container.innerHTML = '<p>No stops planned for this journey.</p>';
-        return;
-    }
-
-    // Group stops by type
-    const stopsByType = stops.reduce((acc, stop) => {
-        const type = stop.type || 'other';
-        if (!acc[type]) acc[type] = [];
-        acc[type].push(stop);
-        return acc;
-    }, {});
-
-    container.innerHTML = `
-        <div class="result-card">
-            ${Object.entries(stopsByType).map(([type, typeStops]) => `
-                <div class="mb-4">
-                    <h5 class="result-title">${type.charAt(0).toUpperCase() + type.slice(1)} Stops</h5>
-                    ${typeStops.map((stop, index) => `
-                        <div class="stop-card mb-3">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div>
-                                    <h6>${type.charAt(0).toUpperCase() + type.slice(1)} Stop ${index + 1}</h6>
-                                    <p class="mb-1">Location: ${stop.location.address || 'Unknown location'}</p>
-                                    ${stop.distance_from_start ? `
-                                        <p class="mb-1">Distance: ${formatDistance(stop.distance_from_start)}</p>
-                                    ` : ''}
-                                    ${stop.duration ? `
-                                        <p class="mb-1">Duration: ${formatDuration(stop.duration)}</p>
-                                    ` : ''}
-                                    ${stop.facilities && stop.facilities.length > 0 ? `
-                                        <p class="mb-1">Facilities: ${stop.facilities.join(', ')}</p>
-                                    ` : ''}
-                                    ${stop.type === 'refueling' ? `
-                                        <p class="mb-1">Fuel level on arrival: ${stop.fuel_level_before.toFixed(1)}L</p>
-                                        <p class="mb-1">Refuel amount: ${stop.fuel_needed.toFixed(1)}L</p>
-                                        ${stop.estimated_cost ? `
-                                            <p class="mb-1">Estimated cost: ${formatCurrency(stop.estimated_cost.amount, stop.estimated_cost.currency)}</p>
-                                        ` : ''}
-                                    ` : ''}
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
-
-function createStopPopup(stop) {
-    let content = `<div class="stop-popup">
-        <h6>${stop.name || 'Stop'}</h6>
-        <p class="mb-1">Distance: ${formatDistance(stop.distance_from_start)}</p>`;
-
-    if (stop.fuel_needed > 0) {
-        content += `
-            <p class="mb-1">Fuel level on arrival: ${stop.fuel_level_before.toFixed(1)}L</p>
-            <p class="mb-1">Refuel amount: ${stop.fuel_needed.toFixed(1)}L</p>`;
-    }
-
-    if (stop.rest_time_needed) {
-        content += `<p class="mb-1">Rest time: ${stop.rest_time_needed} minutes</p>`;
-    }
-
-    if (stop.facilities && stop.facilities.length > 0) {
-        content += `<p class="mb-0"><small>Facilities: ${stop.facilities.join(', ')}</small></p>`;
-    }
-
-    content += '</div>';
-    return content;
-}
-
 function displayRouteDetails(route) {
-    const container = document.getElementById('routeDetails');
-    container.innerHTML = `
-        <div class="result-card">
-            <h5 class="result-title">Route Summary</h5>
-            <div class="result-detail">
-                <p><strong>Total Distance:</strong> ${formatDistance(route.total_distance)}</p>
-                <p><strong>Total Duration:</strong> ${formatDuration(route.total_duration)}</p>
-            </div>
-            <div class="route-segments mt-3">
-                <h6>Route Segments</h6>
-                ${route.segments.map((segment, index) => `
-                    <div class="segment-card mb-2">
-                        <div class="segment-header">
-                            <strong>Segment ${index + 1}</strong>
-                        </div>
-                        <div class="segment-details">
-                            <p class="mb-1"><small>From: ${segment.start_location.address || 'Start'}</small></p>
-                            <p class="mb-1"><small>To: ${segment.end_location.address || 'End'}</small></p>
-                            <p class="mb-1"><small>Distance: ${formatDistance(segment.distance)}</small></p>
-                            <p class="mb-1"><small>Duration: ${formatDuration(segment.duration)}</small></p>
-                        </div>
-                        ${segment.instructions.length > 0 ? `
-                            <div class="segment-instructions">
-                                <small>
-                                    <strong>Instructions:</strong>
-                                    <ul class="mb-0">
-                                        ${segment.instructions.map(instruction => `
-                                            <li>${instruction}</li>
-                                        `).join('')}
-                                    </ul>
-                                </small>
-                            </div>
-                        ` : ''}
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `;
+    const container = document.getElementById('routeDetailsContent');
+    if (!container) return;
+
+    try {
+        let html = `
+            <h5>Route Summary</h5>
+            <p><strong>Total Distance:</strong> ${formatDistance(route.total_distance || 0)}</p>
+            <p><strong>Estimated Time:</strong> ${formatDuration(route.total_duration || 0)}</p>
+        `;
+
+        if (route.segments && route.segments.length > 0) {
+            html += '<h5 class="mt-3">Route Segments</h5>';
+            html += '<div class="list-group">';
+            route.segments.forEach(segment => {
+                html += createSegmentCard(segment);
+            });
+            html += '</div>';
+        }
+
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error displaying route details:', error);
+        container.innerHTML = '<div class="alert alert-danger">Error displaying route details</div>';
+    }
+}
+
+function displayStopsDetails(stops) {
+    const container = document.getElementById('stopsContent');
+    if (!container) return;
+
+    let html = '<div class="list-group">';
+    stops.forEach(stop => {
+        html += createStopCard(stop);
+    });
+    html += '</div>';
+
+    container.innerHTML = html;
 }
 
 function displayAccommodationDetails(accommodation) {
@@ -364,376 +283,249 @@ function displayAccommodationDetails(accommodation) {
     `;
 }
 
-function displayCostDetails(costs) {
-    const container = document.getElementById('costsDetails');
-    console.log('Displaying cost details:', costs);
-    
-    // Define all possible cost types with their display names
-    const costTypes = {
-        fuel_cost: 'Fuel',
-        ticket_cost: 'Tickets',
-        food_cost: 'Food',
-        water_cost: 'Water',
-        accommodation_cost: 'Accommodation',
-        toll_cost: 'Road Tolls',
-        parking_cost: 'Parking',
-        maintenance_cost: 'Vehicle Maintenance',
-        rest_stop_cost: 'Rest Stops',
-        other_cost: 'Other Expenses'
-    };
+function displayWeatherDetails(weather) {
+    try {
+        const container = document.getElementById('weatherContent');
+        if (!container) return;
 
-    // Create cost items array from all available costs
-    const costItems = Object.entries(costs)
-        .filter(([key, value]) => 
-            key in costTypes && // Only include known cost types
-            value !== null && 
-            value !== undefined && 
-            value !== 0 && 
-            key !== 'total_cost' && // Exclude total cost as it's shown separately
-            key !== 'currency' // Exclude currency as it's not a cost
-        )
-        .map(([key, value]) => ({
-            category: costTypes[key],
-            amount: value,
-            key: key
-        }));
+        // Validate weather data
+        if (!weather || (!weather.temperature && !weather.precipitation)) {
+            container.innerHTML = '<div class="alert alert-warning">Weather data is not available for this route.</div>';
+            return;
+        }
 
-    // Sort cost items by amount (highest first)
-    costItems.sort((a, b) => b.amount - a.amount);
-
-    // Additional details for car travel
-    const carDetails = [];
-    if (costs.fuel_consumption) carDetails.push(`Fuel consumption: ${costs.fuel_consumption.toFixed(1)}L`);
-    if (costs.refueling_stops) carDetails.push(`Refueling stops needed: ${costs.refueling_stops}`);
-    
-    // Get car specifications from the form if it's a car journey
-    const transportationType = document.getElementById('transportationType').value;
-    if (transportationType === 'car') {
-        const passengers = parseInt(document.getElementById('passengers').value);
-        const baseMass = 1200; // kg
-        const passengerMass = 75; // kg per passenger
-        const totalMass = baseMass + (passengerMass * passengers);
-        
-        carDetails.unshift(
-            `Vehicle mass: ${baseMass}kg`,
-            `Passengers: ${passengers} × ${passengerMass}kg = ${passengerMass * passengers}kg`,
-            `Total mass: ${totalMass}kg`
-        );
-    }
-
-    // Calculate the sum of all individual costs
-    const sumOfCosts = costItems.reduce((sum, item) => sum + item.amount, 0);
-    const totalCost = costs.total_cost || sumOfCosts;
-
-    // Check if there's a difference between total and sum of items
-    const unexplainedCosts = totalCost - sumOfCosts;
-
-    container.innerHTML = `
-        <div class="result-card">
-            <h5 class="result-title">Cost Breakdown</h5>
-            <div class="cost-breakdown">
-                ${costItems.map(item => `
-                    <div class="cost-item">
-                        <span class="cost-label">${item.category}</span>
-                        <span class="cost-value">${formatCurrency(item.amount, costs.currency)}</span>
+        let html = `
+            <h5>Weather Forecast</h5>
+            <div class="row">
+                ${weather.temperature ? `
+                    <div class="col-md-6">
+                        <h6>Temperature</h6>
+                        <div class="chart-container">
+                            <canvas id="temperatureChart"></canvas>
+                        </div>
                     </div>
-                `).join('')}
-                ${unexplainedCosts > 0 ? `
-                    <div class="cost-item text-warning">
-                        <span class="cost-label">Additional Costs</span>
-                        <span class="cost-value">${formatCurrency(unexplainedCosts, costs.currency)}</span>
-                        <small class="d-block text-muted">These costs may include service fees, taxes, or other miscellaneous expenses</small>
+                ` : ''}
+                ${weather.precipitation ? `
+                    <div class="col-md-6">
+                        <h6>Precipitation</h6>
+                        <div class="chart-container">
+                            <canvas id="precipitationChart"></canvas>
+                        </div>
                     </div>
                 ` : ''}
             </div>
-            ${carDetails.length > 0 ? `
-                <div class="car-details mt-3">
-                    <h6>Journey Details</h6>
-                    ${carDetails.map(detail => `<p class="mb-1">${detail}</p>`).join('')}
-                </div>
-            ` : ''}
-            <div class="mt-3">
-                <h6>Total Cost</h6>
-                <div class="cost-item total-cost">
-                    <span class="cost-value">${formatCurrency(totalCost, costs.currency)}</span>
-                </div>
-            </div>
-        </div>
-    `;
+        `;
+
+        container.innerHTML = html;
+
+        // Create weather charts only if data is available
+        if (weather.temperature) {
+            createWeatherChart('temperatureChart', weather.temperature);
+        }
+        if (weather.precipitation) {
+            createWeatherChart('precipitationChart', weather.precipitation);
+        }
+    } catch (error) {
+        console.error('Error displaying weather details:', error);
+        if (container) {
+            container.innerHTML = '<div class="alert alert-danger">Error displaying weather information</div>';
+        }
+    }
+}
+
+function displayCostDetails(costs) {
+    try {
+        const container = document.getElementById('costsContent');
+        if (!container) return;
+
+        // Validate costs data
+        if (!costs) {
+            container.innerHTML = '<div class="alert alert-warning">Cost information is not available.</div>';
+            return;
+        }
+
+        let html = `
+            <h5>Cost Breakdown</h5>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        // Display fuel costs if present
+        if (costs.fuel_cost) {
+            html += `
+                <tr>
+                    <td>Fuel</td>
+                    <td>${formatCurrency(costs.fuel_cost, costs.currency)}
+                        ${costs.fuel_consumption ? `<br><small class="text-muted">(${costs.fuel_consumption.toFixed(1)} L)</small>` : ''}
+                    </td>
+                </tr>
+            `;
+        }
+
+        // Display maintenance costs if present
+        if (costs.maintenance_cost) {
+            html += `
+                <tr>
+                    <td>Maintenance</td>
+                    <td>${formatCurrency(costs.maintenance_cost, costs.currency)}</td>
+                </tr>
+            `;
+        }
+
+        // Display ticket costs for public transport
+        if (costs.ticket_cost) {
+            html += `
+                <tr>
+                    <td>Tickets</td>
+                    <td>${formatCurrency(costs.ticket_cost, costs.currency)}</td>
+                </tr>
+            `;
+        }
+
+        // Display food and water costs if present
+        if (costs.food_cost) {
+            html += `
+                <tr>
+                    <td>Food</td>
+                    <td>${formatCurrency(costs.food_cost, costs.currency)}</td>
+                </tr>
+            `;
+        }
+
+        if (costs.water_cost) {
+            html += `
+                <tr>
+                    <td>Water</td>
+                    <td>${formatCurrency(costs.water_cost, costs.currency)}</td>
+                </tr>
+            `;
+        }
+
+        // Display accommodation costs if present
+        if (costs.accommodation_cost) {
+            html += `
+                <tr>
+                    <td>Accommodation</td>
+                    <td>${formatCurrency(costs.accommodation_cost, costs.currency)}</td>
+                </tr>
+            `;
+        }
+
+        // Display refueling stops if present
+        if (costs.refueling_stops !== undefined && costs.refueling_stops !== null) {
+            html += `
+                <tr>
+                    <td>Refueling Stops</td>
+                    <td>${costs.refueling_stops}</td>
+                </tr>
+            `;
+        }
+
+        // Always display total cost
+        html += `
+                <tr class="table-primary">
+                    <td><strong>Total</strong></td>
+                    <td><strong>${formatCurrency(costs.total_cost || 0, costs.currency)}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+        </div>`;
+
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error displaying cost details:', error);
+        container.innerHTML = '<div class="alert alert-danger">Error displaying cost information</div>';
+    }
 }
 
 function displayHealthDetails(health) {
-    const container = document.getElementById('healthDetails');
-    container.innerHTML = `
-        <div class="result-card">
-            <h5 class="result-title">Health Impact</h5>
-            <div class="health-details">
-                <p><strong>Total Calories Burned:</strong> ${Math.round(health.total_calories)} kcal</p>
-                <div class="activity-breakdown mt-3">
-                    <h6>Activity Breakdown</h6>
-                    ${Object.entries(health.activity_breakdown).map(([activity, calories]) => `
-                        <div class="activity-item">
-                            <span class="activity-label text-capitalize">${activity}</span>
-                            <span class="activity-value">${Math.round(calories)} kcal</span>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        </div>
-    `;
-}
+    const container = document.getElementById('healthContent');
+    if (!container) return;
 
-function displayWeatherDetails(weather) {
-    console.log('Displaying weather details:', weather);
-    const container = document.getElementById('weatherDetails');
-    
-    if (!weather || (!weather.origin && !weather.destination)) {
-        console.warn('No weather data available');
-        container.innerHTML = '<p>Weather data not available.</p>';
-        return;
+    let html = `
+        <h5>Health Impact</h5>
+        <div class="alert ${health.risk_level === 'low' ? 'alert-success' : health.risk_level === 'medium' ? 'alert-warning' : 'alert-danger'}">
+            <strong>Risk Level:</strong> ${health.risk_level.toUpperCase()}
+        </div>
+        <p>${health.description}</p>
+    `;
+
+    if (health.recommendations && health.recommendations.length > 0) {
+        html += `
+            <h6>Recommendations</h6>
+            <ul>
+                ${health.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+            </ul>
+        `;
     }
 
-    const createWeatherCard = (locationData, title) => {
-        console.log(`Creating weather card for ${title}:`, locationData);
-        return `
-            <div class="weather-card mb-4">
-                <h6 class="mb-3">${title} - ${locationData.location}</h6>
-                
-                <div class="current-weather mb-3">
-                    <h6 class="text-muted">Current Conditions</h6>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="mb-1">Temperature: ${locationData.weather.current.temperature}°C</p>
-                            <p class="mb-1">Wind Speed: ${locationData.weather.current.wind_speed} m/s</p>
-                            <p class="mb-0">Time: ${new Date(locationData.weather.current.time).toLocaleString()}</p>
-                        </div>
-                        <div class="weather-icon">
-                            ${locationData.weather.current.temperature > 20 ? '☀️' : 
-                              locationData.weather.current.temperature < 0 ? '❄️' : '⛅'}
-                        </div>
-                    </div>
+    container.innerHTML = html;
+}
+
+function createSegmentCard(segment) {
+    try {
+        // Format stops information if present
+        let stopsHtml = '';
+        if (segment.stops && segment.stops.length > 0) {
+            stopsHtml = `
+                <div class="mt-2">
+                    <strong>Stops:</strong>
+                    <ul class="mb-0">
+                        ${segment.stops.map(stop => `
+                            <li>${stop.type} stop - ${formatDuration(stop.duration || 0)} duration</li>
+                        `).join('')}
+                    </ul>
                 </div>
-                
-                <div class="forecast">
-                    <h6 class="text-muted">24-Hour Forecast</h6>
-                    <div class="forecast-chart">
-                        <canvas id="${title.toLowerCase()}-chart" width="400" height="200"></canvas>
+            `;
+        }
+
+        return `
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">${segment.start_location.address || 'Start'} → ${segment.end_location.address || 'End'}</h6>
+                        <p class="mb-1">Distance: ${formatDistance(segment.distance || 0)}</p>
+                        <p class="mb-1">Driving Time: ${formatDuration(segment.duration || 0)}</p>
+                        ${stopsHtml}
+                        ${segment.instructions ? `
+                            <small>
+                                <strong>Instructions:</strong>
+                                <ul class="mb-0">
+                                    ${segment.instructions.map(instruction => `<li>${instruction}</li>`).join('')}
+                                </ul>
+                            </small>
+                        ` : ''}
                     </div>
                 </div>
             </div>
         `;
-    };
-
-    container.innerHTML = `
-        <div class="result-card">
-            <h5 class="result-title">Weather Conditions</h5>
-            
-            ${weather.origin ? createWeatherCard(weather.origin, 'Origin') : ''}
-            ${weather.destination ? createWeatherCard(weather.destination, 'Destination') : ''}
-            
-            ${weather.recommendations && weather.recommendations.length > 0 ? `
-                <div class="weather-recommendations mt-3">
-                    <h6 class="text-muted">Weather Recommendations</h6>
-                    <ul class="list-unstyled">
-                        ${weather.recommendations.map(rec => `
-                            <li class="mb-2">
-                                <i class="bi bi-info-circle text-primary"></i>
-                                ${rec}
-                            </li>
-                        `).join('')}
-                    </ul>
-                </div>
-            ` : ''}
-        </div>
-    `;
-
-    // Create charts if weather data is available
-    if (weather.origin) {
-        console.log('Creating origin weather chart with data:', weather.origin.weather.forecast);
-        createWeatherChart(
-            'origin-chart',
-            weather.origin.weather.forecast
-        );
+    } catch (error) {
+        console.error('Error creating segment card:', error);
+        return '<div class="list-group-item">Error displaying segment</div>';
     }
-    
-    if (weather.destination) {
-        console.log('Creating destination weather chart with data:', weather.destination.weather.forecast);
-        createWeatherChart(
-            'destination-chart',
-            weather.destination.weather.forecast
-        );
-    }
-}
-
-function createWeatherChart(canvasId, forecast) {
-    console.log(`Creating weather chart for ${canvasId}:`, forecast);
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) {
-        console.error(`Canvas element ${canvasId} not found`);
-        return;
-    }
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-        console.error(`Could not get 2D context for ${canvasId}`);
-        return;
-    }
-    
-    // Format times for display
-    const labels = forecast.times.map(time => {
-        const date = new Date(time);
-        if (isNaN(date.getTime())) {
-            console.error(`Invalid time value: ${time}`);
-            return time;
-        }
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    });
-
-    console.log('Chart labels:', labels);
-    console.log('Temperature data:', forecast.temperatures);
-    console.log('Humidity data:', forecast.humidity);
-    console.log('Wind speed data:', forecast.wind_speed);
-
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Temperature (°C)',
-                    data: forecast.temperatures,
-                    borderColor: 'rgb(255, 99, 132)',
-                    tension: 0.1,
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'Humidity (%)',
-                    data: forecast.humidity,
-                    borderColor: 'rgb(54, 162, 235)',
-                    tension: 0.1,
-                    yAxisID: 'y1'
-                },
-                {
-                    label: 'Wind Speed (m/s)',
-                    data: forecast.wind_speed,
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1,
-                    yAxisID: 'y2'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            interaction: {
-                mode: 'index',
-                intersect: false,
-            },
-            scales: {
-                y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    title: {
-                        display: true,
-                        text: 'Temperature (°C)'
-                    }
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Humidity (%)'
-                    },
-                    grid: {
-                        drawOnChartArea: false
-                    }
-                },
-                y2: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Wind Speed (m/s)'
-                    },
-                    grid: {
-                        drawOnChartArea: false
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Utility functions
-function formatDistance(meters) {
-    return `${(meters / 1000).toFixed(1)} km`;
-}
-
-function formatDuration(minutes) {
-    if (typeof minutes !== 'number' || isNaN(minutes)) {
-        return '0h 0m';
-    }
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.floor(minutes % 60);
-    return `${hours}h ${mins}m`;
-}
-
-function formatCurrency(amount, currency = 'USD') {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currency || 'USD'  // Default to USD if currency is not provided
-    }).format(amount);
-}
-
-function createStopPopup(stop) {
-    let content = `<div class="stop-popup">
-        <h6>${stop.name || 'Stop'}</h6>
-        <p class="mb-1">Distance: ${formatDistance(stop.distance_from_start)}</p>`;
-
-    if (stop.fuel_needed > 0) {
-        content += `
-            <p class="mb-1">Fuel level on arrival: ${stop.fuel_level_before.toFixed(1)}L</p>
-            <p class="mb-1">Refuel amount: ${stop.fuel_needed.toFixed(1)}L</p>`;
-    }
-
-    if (stop.rest_time_needed) {
-        content += `<p class="mb-1">Rest time: ${stop.rest_time_needed} minutes</p>`;
-    }
-
-    if (stop.facilities && stop.facilities.length > 0) {
-        content += `<p class="mb-0"><small>Facilities: ${stop.facilities.join(', ')}</small></p>`;
-    }
-
-    content += '</div>';
-    return content;
-}
-
-function createSegmentCard(segment) {
-    return `
-        <div class="result-card">
-            <div class="d-flex justify-content-between align-items-center">
-                <h6>${segment.start_location.address} → ${segment.end_location.address}</h6>
-                <span class="badge bg-primary">${segment.transportation.type}</span>
-            </div>
-            <div class="result-detail">
-                <p>Distance: ${formatDistance(segment.distance)}</p>
-                <p>Duration: ${formatDuration(segment.duration)}</p>
-                <p>Cost: ${formatCurrency(segment.total_segment_cost, 'USD')}</p>
-            </div>
-        </div>
-    `;
 }
 
 function createStopCard(stop) {
     return `
-        <div class="result-card">
-            <div class="result-detail">
-                <p><strong>Location:</strong> ${stop.location.address}</p>
-                <p><strong>Duration:</strong> ${formatDuration(stop.duration)}</p>
-                <p><strong>Available Facilities:</strong> ${stop.facilities.join(', ')}</p>
+        <div class="list-group-item">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1">${stop.name || 'Stop'}</h6>
+                    <p class="mb-1">Distance: ${formatDistance(stop.distance_from_start)}</p>
+                    ${stop.duration ? `<p class="mb-1">Duration: ${formatDuration(stop.duration)}</p>` : ''}
+                    ${stop.fuel_needed ? `
+                        <p class="mb-1">Fuel level on arrival: ${stop.fuel_level_before.toFixed(1)}L</p>
+                        <p class="mb-1">Refuel amount: ${stop.fuel_needed.toFixed(1)}L</p>
+                    ` : ''}
+                    ${stop.facilities ? `<p class="mb-0"><small>Facilities: ${stop.facilities.join(', ')}</small></p>` : ''}
+                </div>
             </div>
         </div>
     `;
@@ -776,4 +568,126 @@ function clearMap() {
     if (markersLayer) {
         map.removeLayer(markersLayer);
     }
+}
+
+function createWeatherChart(canvasId, data) {
+    try {
+        console.log(`Creating weather chart for ${canvasId}:`, data);
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) {
+            console.error(`Canvas element ${canvasId} not found`);
+            return;
+        }
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            console.error(`Could not get 2D context for ${canvasId}`);
+            return;
+        }
+
+        // Validate data structure
+        if (!data || !Array.isArray(data.times) || !Array.isArray(data.values)) {
+            console.error(`Invalid data structure for ${canvasId}:`, data);
+            return;
+        }
+        
+        // Format times for display
+        const labels = data.times.map(time => {
+            if (!time) return '';
+            const date = new Date(time);
+            if (isNaN(date.getTime())) {
+                console.error(`Invalid time value: ${time}`);
+                return '';
+            }
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        });
+
+        // Validate values
+        const values = data.values.map(value => {
+            const num = parseFloat(value);
+            return isNaN(num) ? 0 : num;
+        });
+
+        console.log('Chart labels:', labels);
+        console.log('Chart values:', values);
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: canvasId.includes('temperature') ? 'Temperature (°C)' : 'Precipitation (%)',
+                        data: values,
+                        borderColor: canvasId.includes('temperature') ? 'rgb(255, 99, 132)' : 'rgb(54, 162, 235)',
+                        tension: 0.1,
+                        yAxisID: 'y'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: canvasId.includes('temperature') ? 'Temperature (°C)' : 'Precipitation (%)'
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error(`Error creating weather chart ${canvasId}:`, error);
+    }
+}
+
+function createStopPopup(stop) {
+    let content = `<div class="stop-popup">
+        <h6>${stop.name || 'Stop'}</h6>
+        <p class="mb-1">Distance: ${formatDistance(stop.distance_from_start)}</p>`;
+
+    if (stop.fuel_needed > 0) {
+        content += `
+            <p class="mb-1">Fuel level on arrival: ${stop.fuel_level_before.toFixed(1)}L</p>
+            <p class="mb-1">Refuel amount: ${stop.fuel_needed.toFixed(1)}L</p>`;
+    }
+
+    if (stop.rest_time_needed) {
+        content += `<p class="mb-1">Rest time: ${stop.rest_time_needed} minutes</p>`;
+    }
+
+    if (stop.facilities && stop.facilities.length > 0) {
+        content += `<p class="mb-0"><small>Facilities: ${stop.facilities.join(', ')}</small></p>`;
+    }
+
+    content += '</div>';
+    return content;
+}
+
+function formatDistance(meters) {
+    return `${(meters / 1000).toFixed(1)} km`;
+}
+
+function formatDuration(minutes) {
+    if (typeof minutes !== 'number' || isNaN(minutes)) {
+        return '0h 0m';
+    }
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.floor(minutes % 60);
+    return `${hours}h ${mins}m`;
+}
+
+function formatCurrency(amount, currency = 'USD') {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency || 'USD'  // Default to USD if currency is not provided
+    }).format(amount);
 }

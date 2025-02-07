@@ -54,7 +54,7 @@ class TransportCosts(BaseModel):
     class Config:
         use_enum_values = True
 
-    # For cars
+    # For cars and motorcycles
     fuel_cost: Optional[float] = Field(None, description="Cost of fuel for the journey")
     fuel_consumption: Optional[float] = Field(
         None, description="Total fuel consumption in liters"
@@ -84,3 +84,47 @@ class TransportCosts(BaseModel):
     # Total
     total_cost: float = Field(..., description="Total cost of the journey")
     currency: str = Field(default="USD", description="Currency for all costs")
+
+
+class MotorcycleSpecifications(BaseModel):
+    """Motorcycle specifications for fuel consumption calculation"""
+
+    engine_cc: int = Field(default=125, description="Engine size in cubic centimeters")
+    fuel_economy: float = Field(
+        default=45.0, description="Fuel economy in kilometers per liter"
+    )
+    fuel_type: str = Field(
+        default="92", description="Type of fuel (e.g., 92, 95, 98 octane)"
+    )
+    tank_capacity: float = Field(
+        default=10.0, description="Fuel tank capacity in liters"
+    )
+    initial_fuel: float = Field(
+        default=5.0, description="Current fuel level in liters"
+    )
+    base_mass: float = Field(default=150.0, description="Base vehicle mass in kg")
+    passenger_mass: float = Field(
+        default=75.0, description="Standard passenger mass in kg"
+    )
+
+    @property
+    def fuel_level_percentage(self) -> float:
+        """Calculate current fuel level as percentage of tank capacity"""
+        return (
+            (self.initial_fuel / self.tank_capacity) * 100
+            if self.tank_capacity > 0
+            else 0
+        )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "engine_cc": 125,
+                "fuel_economy": 45.0,
+                "fuel_type": "92",
+                "tank_capacity": 10.0,
+                "initial_fuel": 5.0,
+                "base_mass": 150.0,
+                "passenger_mass": 75.0,
+            }
+        }

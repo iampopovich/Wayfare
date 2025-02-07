@@ -42,6 +42,7 @@
                                     <select class="form-select" id="transportationType" required>
                                         <option value="empty">Select Type</option>
                                         <option value="car">Car</option>
+                                        <option value="motorcycle">Motorcycle</option>
                                         <option value="bicycle">Bicycle</option>
                                         <option value="walking">Walking</option>
                                         <option value="bus">Bus</option>
@@ -86,6 +87,37 @@
                                     </div>
                                 </div>
 
+                                <!-- Motorcycle Details -->
+                                <div id="motorcycleDetails" class="mb-3 d-none">
+                                    <h6>Motorcycle Details</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="engineCC" class="form-label">Engine Volume (CC)</label>
+                                            <input type="number" class="form-control" id="engineCC" value="125" step="1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="motorcycleFuelConsumption" class="form-label">Fuel Economy (km/L)</label>
+                                            <input type="number" class="form-control" id="motorcycleFuelConsumption" value="45" step="0.1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="motorcycleTankCapacity" class="form-label">Tank Capacity (L)</label>
+                                            <input type="number" class="form-control" id="motorcycleTankCapacity" value="10.0" step="0.1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="motorcycleInitialFuel" class="form-label">Current Fuel Level (L)</label>
+                                            <input type="number" class="form-control" id="motorcycleInitialFuel" value="5.0" step="0.1" min="0">
+                                        </div>
+                                        <div class="col-12">
+                                            <label for="fuelType" class="form-label">Fuel Type</label>
+                                            <select class="form-select" id="motorcycleFuelType">
+                                                <option value="92" selected>92 Regular</option>
+                                                <option value="95">95 Premium</option>
+                                                <option value="98">98 Super</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- Passengers -->
                                 <div class="mb-3">
                                     <label class="form-label">Number of Passengers</label>
@@ -115,7 +147,7 @@
                                 </div>
 
                                 <!-- Submit Button -->
-                                <button type="submit" class="btn btn-primary w-100">Plan Trip</button>
+                                <button type="submit" class="btn btn-primary mt-3">Calculate Route</button>
                             </form>
                         </div>
                     </div>
@@ -126,12 +158,6 @@
                     <!-- Map -->
                     <div class="card mb-3">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h5 class="card-title mb-0">Route Map</h5>
-                                <button id="shareRouteButton" class="btn btn-outline-primary d-none" onclick="shareRoute()">
-                                    <i class="bi bi-share"></i> Open in Google Maps
-                                </button>
-                            </div>
                             <div id="map" style="height: 400px;"></div>
                         </div>
                     </div>
@@ -139,60 +165,59 @@
                     <!-- Results Tabs -->
                     <div class="card">
                         <div class="card-body">
-                            <ul class="nav nav-tabs" id="resultTabs" role="tablist">
-                                <li class="nav-item">
-                                    <a class="nav-link active" data-bs-toggle="tab" href="#routeTab">Route</a>
+                            <ul class="nav nav-tabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#routeDetails" type="button">Route</button>
                                 </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" data-bs-toggle="tab" href="#stopsTab">Stops</a>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#stopsTab" type="button">Stops</button>
                                 </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" data-bs-toggle="tab" href="#weatherTab">Weather</a>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#weatherTab" type="button">Weather</button>
                                 </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" data-bs-toggle="tab" href="#accommodationTab">Accommodation</a>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#costsTab" type="button">Costs</button>
                                 </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" data-bs-toggle="tab" href="#costsTab">Costs</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" data-bs-toggle="tab" href="#healthTab">Health</a>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#healthTab" type="button">Health</button>
                                 </li>
                             </ul>
 
                             <div class="tab-content mt-3">
-                                <!-- Route Tab -->
-                                <div class="tab-pane fade show active" id="routeTab">
-                                    <div id="routeDetails"></div>
+                                <!-- Route Details Tab -->
+                                <div class="tab-pane fade show active" id="routeDetails" role="tabpanel">
+                                    <div id="routeDetailsContent"></div>
                                 </div>
 
                                 <!-- Stops Tab -->
-                                <div class="tab-pane fade" id="stopsTab">
-                                    <div id="stopsDetails"></div>
+                                <div class="tab-pane fade" id="stopsTab" role="tabpanel">
+                                    <div id="stopsContent"></div>
                                 </div>
 
                                 <!-- Weather Tab -->
-                                <div class="tab-pane fade" id="weatherTab">
-                                    <div id="weatherDetails"></div>
-                                </div>
-
-                                <!-- Accommodation Tab -->
-                                <div class="tab-pane fade" id="accommodationTab">
-                                    <div id="accommodationDetails"></div>
+                                <div class="tab-pane fade" id="weatherTab" role="tabpanel">
+                                    <div id="weatherContent"></div>
+                                    <canvas id="temperatureChart"></canvas>
+                                    <canvas id="precipitationChart"></canvas>
                                 </div>
 
                                 <!-- Costs Tab -->
-                                <div class="tab-pane fade" id="costsTab">
-                                    <div id="costsDetails"></div>
+                                <div class="tab-pane fade" id="costsTab" role="tabpanel">
+                                    <div id="costsContent"></div>
                                 </div>
 
                                 <!-- Health Tab -->
-                                <div class="tab-pane fade" id="healthTab">
-                                    <div id="healthDetails"></div>
+                                <div class="tab-pane fade" id="healthTab" role="tabpanel">
+                                    <div id="healthContent"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Share Button -->
+                    <button id="shareRouteButton" class="btn btn-success mt-3 d-none">
+                        <i class="bi bi-share"></i> Share Route
+                    </button>
                 </div>
             </div>
         </div>
@@ -201,7 +226,7 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="/static/app.js"></script>
+    <script src="/static/script.js"></script>
+    <script src="/static/app.js" type="module"></script>
 </body>
 </html>

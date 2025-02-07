@@ -130,6 +130,9 @@ class GoogleMapsRepository:
                     points = polyline.decode(step["polyline"]["points"])
                     path_points.extend(points)
 
+                # Get the last step's polyline for the segment
+                last_step = leg["steps"][-1] if leg.get("steps") else {"polyline": {"points": ""}}
+
                 segment = RouteSegment(
                     start_location=Location(
                         latitude=leg["start_location"]["lat"],
@@ -141,21 +144,21 @@ class GoogleMapsRepository:
                         longitude=leg["end_location"]["lng"],
                         address=leg.get("end_address", ""),
                     ),
-                    distance=leg["distance"]["value"],
-                    duration=leg["duration"]["value"] / 60,  # Convert to minutes
-                    polyline=step["polyline"]["points"],
+                    distance=float(leg["distance"]["value"]),  # Ensure float
+                    duration=float(leg["duration"]["value"]) / 60,  # Convert seconds to minutes
+                    polyline=last_step["polyline"]["points"],
                     instructions=[
                         step["html_instructions"] for step in leg.get("steps", [])
                     ],
                 )
                 segments.append(segment)
-                total_distance += leg["distance"]["value"]
-                total_duration += leg["duration"]["value"]
+                total_distance += float(leg["distance"]["value"])
+                total_duration += float(leg["duration"]["value"])
 
             route_data = Route(
                 segments=segments,
-                total_distance=total_distance,
-                total_duration=total_duration / 60,  # Convert to minutes
+                total_distance=float(total_distance),  # Ensure float
+                total_duration=float(total_duration) / 60,  # Convert seconds to minutes
                 path_points=path_points,
             )
             logger.info(

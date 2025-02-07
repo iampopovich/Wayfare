@@ -6,7 +6,7 @@ from models.location import Location
 from models.stops import Stop
 from models.costs import Cost
 from models.health import Health
-from models.vehicle import TransportCosts, CarSpecifications
+from models.vehicle import TransportCosts, CarSpecifications, MotorcycleSpecifications
 from repositories.maps.google_maps import GoogleMapsRepository
 from repositories.weather.open_weather_map import WeatherRepository
 from agents.stops import StopsAgent
@@ -26,10 +26,21 @@ class TravelService:
     # Google Maps supported travel modes
     TRANSPORT_MODE_MAPPING = {
         TransportationType.CAR: "driving",
+        TransportationType.MOTORCYCLE: "driving",  # Motorcycles use the same mode as cars
         TransportationType.WALKING: "walking",
         TransportationType.BICYCLE: "bicycling",
         TransportationType.BUS: "transit",
         TransportationType.TRAIN: "transit",
+    }
+
+    # Average fuel prices by type (USD per liter)
+    FUEL_PRICES = {
+        "gasoline": 1.2,
+        "diesel": 1.1,
+        "electric": 0.15,  # Price per kWh
+        "92": 1.1,  # Regular octane
+        "95": 1.25,  # Premium octane
+        "98": 1.4,  # Super octane
     }
 
     def __init__(
@@ -45,18 +56,6 @@ class TravelService:
         self.fuel_agent = FuelPriceAgent()
         self.transport_price_agent = TransportPriceAgent(search_service)
         self.weather_agent = WeatherAgent(weather_repository=weather_repository)
-
-    # Google Maps supported travel modes
-    TRANSPORT_MODE_MAPPING = {
-        TransportationType.CAR: "driving",
-        TransportationType.WALKING: "walking",
-        TransportationType.BICYCLE: "bicycling",
-        TransportationType.BUS: "transit",
-        TransportationType.TRAIN: "transit",
-    }
-
-    # Average fuel prices by type (USD per liter)
-    FUEL_PRICES = {"gasoline": 1.2, "diesel": 1.1, "electric": 0.15}  # Price per kWh
 
     def _get_google_maps_mode(self, transport_type: TransportationType) -> str:
         """Convert our transport type to Google Maps travel mode."""
@@ -98,112 +97,65 @@ class TravelService:
         distance_km = distance_meters / 1000
 
         if transport_type == TransportationType.CAR and request.car_specifications:
-            # Get regional fuel prices for the route
-            start_region = request.origin
-            end_region = request.destination
+            # Calculate car-specific costs
+            specs = request.car_specifications
+            fuel_consumption = (distance_km / 100) * specs.fuel_consumption
+            fuel_price = await self.fuel_agent.get_fuel_price(specs.fuel_type) or self.FUEL_PRICES.get(specs.fuel_type, 1.2)
+            
+            costs.fuel_consumption = fuel_consumption
+            costs.fuel_cost = fuel_consumption * fuel_price
+            costs.maintenance_cost = distance_km * 0.05  # $0.05 per km for maintenance
+            
+            # Calculate number of refueling stops needed
+            if specs.tank_capacity > 0:
+                range_on_current_fuel = (specs.initial_fuel / specs.fuel_consumption) * 100
+                remaining_distance = distance_km - range_on_current_fuel
+                if remaining_distance > 0:
+                    costs.refueling_stops = ceil(remaining_distance / ((specs.tank_capacity / specs.fuel_consumption) * 100))
+                else:
+                    costs.refueling_stops = 0
 
-            # Get fuel prices from FuelPriceAgent
-            fuel_response = await self.fuel_agent.process(
-                stations=await self._find_gas_stations_along_route(
-                    [(0, 0)]
-                ),  # We'll update this with actual coordinates
-                consumption=request.car_specifications.fuel_consumption,
-                fuel_type=request.car_specifications.fuel_type,
-                region=start_region,  # We could also consider the end region for long routes
-            )
-
-            if fuel_response["success"]:
-                fuel_prices = fuel_response["data"]["regional_prices"]
-                fuel_price = fuel_prices["average"]
-            else:
-                logger.warning(f"Failed to get fuel prices: {fuel_response['error']}")
-                fuel_price = self.FUEL_PRICES.get(
-                    request.car_specifications.fuel_type, 1.0
-                )
-
-            # Calculate fuel cost
-            distance_km = distance_meters / 1000
-            fuel_consumption = request.car_specifications.fuel_consumption
-            total_fuel_needed = (distance_km / 100) * fuel_consumption
-            fuel_cost = total_fuel_needed * fuel_price
-
-            # Add maintenance cost (simplified)
-            maintenance_cost = distance_km * 0.05  # $0.05 per km
-
-            return TransportCosts(
-                fuel_cost=fuel_cost,
-                maintenance_cost=maintenance_cost,
-                fuel_consumption=total_fuel_needed,
-                total_cost=fuel_cost + maintenance_cost,
-                currency="USD",
-            )
+        elif transport_type == TransportationType.MOTORCYCLE and request.motorcycle_specifications:
+            # Calculate motorcycle-specific costs
+            specs = request.motorcycle_specifications
+            # Convert km/L to total liters needed
+            fuel_consumption = distance_km / specs.fuel_economy
+            fuel_price = await self.fuel_agent.get_fuel_price(specs.fuel_type) or self.FUEL_PRICES.get(specs.fuel_type, 1.1)
+            
+            costs.fuel_consumption = fuel_consumption
+            costs.fuel_cost = fuel_consumption * fuel_price
+            costs.maintenance_cost = distance_km * 0.03  # $0.03 per km for maintenance (lower than cars)
+            
+            # Calculate number of refueling stops needed
+            if specs.tank_capacity > 0:
+                range_on_current_fuel = specs.initial_fuel * specs.fuel_economy
+                remaining_distance = distance_km - range_on_current_fuel
+                if remaining_distance > 0:
+                    costs.refueling_stops = ceil(remaining_distance / (specs.tank_capacity * specs.fuel_economy))
+                else:
+                    costs.refueling_stops = 0
 
         elif transport_type in [TransportationType.BUS, TransportationType.TRAIN]:
-            # Get ticket prices from TransportPriceAgent
-            price_response = await self.transport_price_agent.process(
-                origin=request.origin,
-                destination=request.destination,
-                transport_type=transport_type.value,
-                date=(
-                    request.departure_time.strftime("%Y-%m-%d")
-                    if request.departure_time
-                    else None
-                ),
+            # Get ticket prices from transport price agent
+            ticket_price = await self.transport_price_agent.get_ticket_price(
+                transport_type, request.origin, request.destination
             )
+            costs.ticket_cost = ticket_price * request.passengers
 
-            if price_response["success"]:
-                prices = price_response["data"]["prices"]
-                ticket_cost = (
-                    prices["average"] if prices["average"] else 50.0
-                )  # Default fallback price
+        # Calculate total cost
+        total_cost = 0
+        for cost_field in [
+            costs.fuel_cost,
+            costs.ticket_cost,
+            costs.food_cost,
+            costs.water_cost,
+            costs.accommodation_cost,
+            costs.maintenance_cost,
+        ]:
+            if cost_field is not None:
+                total_cost += cost_field
 
-                # Add booking URL if available
-                booking_links = price_response["data"]["booking_links"]
-                booking_url = booking_links[0]["url"] if booking_links else None
-
-                return TransportCosts(
-                    ticket_cost=ticket_cost,
-                    booking_url=booking_url,
-                    total_cost=ticket_cost,
-                    currency="USD",
-                )
-            else:
-                logger.warning(
-                    f"Failed to get transport prices: {price_response['error']}"
-                )
-                # Fallback to distance-based estimation
-                distance_km = distance_meters / 1000
-                estimated_cost = distance_km * 0.1  # $0.1 per km
-
-                return TransportCosts(
-                    ticket_cost=estimated_cost,
-                    total_cost=estimated_cost,
-                    currency="USD",
-                )
-
-        elif transport_type in [TransportationType.PLANE]:
-            # Set base ticket prices per km for different transport types
-            ticket_rates = {
-                TransportationType.BUS: 0.1,  # $0.1 per km
-                TransportationType.TRAIN: 0.15,  # $0.15 per km
-                TransportationType.PLANE: 0.5,  # $0.5 per km
-            }
-
-            base_rate = ticket_rates[transport_type]
-            costs.ticket_cost = round(distance_km * base_rate * request.passengers, 2)
-            costs.total_cost = costs.ticket_cost
-
-        # For walking, only include food, water, and accommodation costs
-
-        # Add food, water and accommodation costs to total
-        if costs.food_cost:
-            costs.total_cost += costs.food_cost
-        if costs.water_cost:
-            costs.total_cost += costs.water_cost
-        if costs.accommodation_cost:
-            costs.total_cost += costs.accommodation_cost
-
-        logger.info(f"Calculated costs: {costs}")
+        costs.total_cost = total_cost
         return costs
 
     async def _find_gas_stations_along_route(
@@ -284,6 +236,8 @@ class TravelService:
             logger.info(f"Transportation type: {request.transportation_type}")
             if request.car_specifications:
                 logger.info(f"Car specs: {request.car_specifications}")
+            if request.motorcycle_specifications:
+                logger.info(f"Motorcycle specs: {request.motorcycle_specifications}")
 
             # First, geocode the origin and destination
             logger.info(
@@ -337,15 +291,33 @@ class TravelService:
             gas_stations = await self._find_gas_stations_along_route(route_points)
             logger.info(f"Found {len(gas_stations)} gas stations along route")
 
-            # Calculate stops for car trips
+            # Calculate stops for car and motorcycle trips
             stops = []
             if (
-                request.transportation_type == TransportationType.CAR
-                and request.car_specifications
+                request.transportation_type in [TransportationType.CAR, TransportationType.MOTORCYCLE]
+                and (request.car_specifications or request.motorcycle_specifications)
             ):
                 logger.info("Calculating optimal stops using StopsAgent")
 
                 # Prepare data for StopsAgent
+                vehicle_specs = {}
+                if request.transportation_type == TransportationType.CAR:
+                    vehicle_specs = {
+                        "fuel_consumption": request.car_specifications.fuel_consumption,
+                        "tank_capacity": request.car_specifications.tank_capacity,
+                        "initial_fuel": request.car_specifications.initial_fuel,
+                        "fuel_type": request.car_specifications.fuel_type,
+                    }
+                else:  # Motorcycle
+                    # Convert km/L to L/100km for consistency
+                    fuel_consumption = 100 / request.motorcycle_specifications.fuel_economy
+                    vehicle_specs = {
+                        "fuel_consumption": fuel_consumption,
+                        "tank_capacity": request.motorcycle_specifications.tank_capacity,
+                        "initial_fuel": request.motorcycle_specifications.initial_fuel,
+                        "fuel_type": request.motorcycle_specifications.fuel_type,
+                    }
+
                 agent_response = await self.stops_agent.process(
                     route_details={
                         "total_distance": total_distance_km,
@@ -371,19 +343,14 @@ class TravelService:
                         ],
                         "gas_stations": gas_stations,
                     },
-                    transportation_type="car",
+                    transportation_type=request.transportation_type.value,
                     conditions={
-                        "car_specifications": {
-                            "fuel_consumption": request.car_specifications.fuel_consumption,
-                            "tank_capacity": request.car_specifications.tank_capacity,
-                            "initial_fuel": request.car_specifications.initial_fuel,
-                            "fuel_type": request.car_specifications.fuel_type,
-                        },
+                        "vehicle_specifications": vehicle_specs,
                         "passengers": request.passengers,
                     },
                     time_constraints={
-                        "max_driving_time": 240,  # 4 hours
-                        "min_rest_time": 30,  # 30 minutes
+                        "max_driving_time": 180 if request.transportation_type == TransportationType.MOTORCYCLE else 240,  # 3 hours for motorcycle, 4 for car
+                        "min_rest_time": 45 if request.transportation_type == TransportationType.MOTORCYCLE else 30,  # 45 minutes for motorcycle, 30 for car
                     },
                     required_stops=["fuel", "rest"],
                 )
@@ -391,6 +358,10 @@ class TravelService:
                 if agent_response["success"]:
                     logger.info("Successfully calculated stops with StopsAgent")
                     stops = agent_response["data"]["planned_stops"]
+                    total_duration = agent_response["data"]["timing"]["total_duration"]
+
+                    # Update route total duration to include stops
+                    route.total_duration = total_duration
 
                     # Add stops to route segments
                     for stop in stops:
@@ -406,8 +377,9 @@ class TravelService:
                                 < current_distance + segment_distance
                             ):
                                 # This stop belongs to this segment
-                                if not hasattr(segment, "refueling_stop"):
-                                    segment.refueling_stop = stop
+                                if not hasattr(segment, "stops"):
+                                    segment.stops = []
+                                segment.stops.append(stop)
                                 break
                             current_distance += segment_distance
                 else:
@@ -419,7 +391,7 @@ class TravelService:
             logger.info("Calculating transport costs")
             costs = await self._calculate_transport_costs(
                 sum(segment.distance for segment in route.segments),
-                sum(segment.duration for segment in route.segments),
+                route.total_duration,  # Use updated duration that includes stops
                 request.transportation_type,
                 request,
             )
@@ -493,6 +465,7 @@ class TravelService:
         # Simple calorie calculation
         base_rate = {
             TransportationType.CAR: 0.1,  # Very low for driving
+            TransportationType.MOTORCYCLE: 0.2,  # Slightly more for motorcycles
             TransportationType.BUS: 0.2,  # Slightly more for public transport
             TransportationType.TRAIN: 0.2,  # Similar to bus
             TransportationType.WALKING: 60,  # 60 calories per km

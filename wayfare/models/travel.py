@@ -6,11 +6,12 @@ from models.route import Route
 from models.stops import Stop
 from models.costs import Cost
 from models.health import Health
-from models.vehicle import CarSpecifications, TransportCosts
+from models.vehicle import CarSpecifications, TransportCosts, MotorcycleSpecifications
 
 
 class TransportationType(str, Enum):
     CAR = "car"
+    MOTORCYCLE = "motorcycle"
     BUS = "bus"
     TRAIN = "train"
     WALKING = "walking"
@@ -51,9 +52,12 @@ class TravelRequest(BaseModel):
         ..., description="Type of transportation"
     )
 
-    # Car specific details
+    # Vehicle specific details
     car_specifications: Optional[CarSpecifications] = Field(
         None, description="Car specifications if traveling by car"
+    )
+    motorcycle_specifications: Optional[MotorcycleSpecifications] = Field(
+        None, description="Motorcycle specifications if traveling by motorcycle"
     )
 
     # Public transport preferences
@@ -75,6 +79,21 @@ class TravelRequest(BaseModel):
             if not v:
                 # Use default car specifications if none provided
                 return CarSpecifications()
+        return v
+
+    @validator("motorcycle_specifications")
+    def validate_motorcycle_specs(cls, v, values):
+        if values.get("transportation_type") == TransportationType.MOTORCYCLE:
+            if not v:
+                # Use default motorcycle specifications if none provided
+                return MotorcycleSpecifications()
+        return v
+
+    @validator("passengers")
+    def validate_passengers(cls, v, values):
+        transport_type = values.get("transportation_type")
+        if transport_type == TransportationType.MOTORCYCLE and v > 2:
+            raise ValueError("Motorcycle can carry maximum 2 passengers")
         return v
 
     class Config:
