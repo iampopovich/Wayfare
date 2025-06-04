@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import List
 from pydantic_settings import BaseSettings
 from pydantic import AnyHttpUrl, validator
@@ -37,8 +38,14 @@ class Settings(BaseSettings):
         raise ValueError(v)
 
     class Config:
-        case_sensitive = True
-        env_file = ".env"
+        case_sensitive = True  # Variables are case-sensitive
+        env_file = ".env"      # Load environment variables from .env file
+        env_file_encoding = "utf-8" # Encoding for the .env file
+
+
+@lru_cache() # Cache the settings object for performance
+def get_settings() -> Settings:
+    return Settings()
 
 
 settings = Settings()
