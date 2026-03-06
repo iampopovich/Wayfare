@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wayfare - Intelligent Trip Planner</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/styles.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="#">Wayfare</a>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div id="errorMessage" class="alert alert-danger d-none" role="alert"></div>
+            <div class="row">
+                <!-- Left Column - Input Form -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Trip Planning</h5>
+                            <form id="tripForm">
+                                <!-- Route Details -->
+                                <div class="mb-3">
+                                    <label class="form-label">Origin</label>
+                                    <input type="text" class="form-control" id="origin" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Destination</label>
+                                    <input type="text" class="form-control" id="destination" required>
+                                </div>
+
+                                <!-- Transportation -->
+                                <div class="mb-3">
+                                    <label class="form-label">Transportation Type</label>
+                                    <select class="form-select" id="transportationType" required>
+                                        <option value="empty">Select Type</option>
+                                        <option value="car">Car</option>
+                                        <option value="motorcycle">Motorcycle</option>
+                                        <option value="bicycle">Bicycle</option>
+                                        <option value="walking">Walking</option>
+                                        <option value="bus">Bus</option>
+                                        <option value="train">Train</option>
+                                        <option value="plane">Plane</option>
+                                        <option value="sea">Sea Transport</option>
+                                    </select>
+                                </div>
+
+                                <!-- Car Details (shown only when car is selected) -->
+                                <div id="carDetails" class="mb-3 d-none">
+                                    <h6>Car Details</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="carModel" class="form-label">Car Model</label>
+                                            <input type="text" class="form-control" id="carModel" value="Standard 1.6L">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="engineVolume" class="form-label">Engine Volume (L)</label>
+                                            <input type="number" class="form-control" id="engineVolume" value="1.6" step="0.1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="fuelConsumption" class="form-label">Fuel Consumption (L/100km)</label>
+                                            <input type="number" class="form-control" id="fuelConsumption" value="11.0" step="0.1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="tankCapacity" class="form-label">Tank Capacity (L)</label>
+                                            <input type="number" class="form-control" id="tankCapacity" value="50.0" step="0.1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="initialFuel" class="form-label">Current Fuel Level (L)</label>
+                                            <input type="number" class="form-control" id="initialFuel" value="25.0" step="0.1" min="0">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="fuelType" class="form-label">Fuel Type</label>
+                                            <select class="form-select" id="fuelType">
+                                                <option value="gasoline">Gasoline</option>
+                                                <option value="diesel">Diesel</option>
+                                                <option value="electric">Electric</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Motorcycle Details -->
+                                <div id="motorcycleDetails" class="mb-3 d-none">
+                                    <h6>Motorcycle Details</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="engineCC" class="form-label">Engine Size (CC)</label>
+                                            <input type="number" class="form-control" id="engineCC" value="125" step="1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="motorcycleFuelConsumption" class="form-label">Fuel Economy (km/L)</label>
+                                            <input type="number" class="form-control" id="motorcycleFuelConsumption" value="45.0" step="0.1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="motorcycleTankCapacity" class="form-label">Tank Capacity (L)</label>
+                                            <input type="number" class="form-control" id="motorcycleTankCapacity" value="10.0" step="0.1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="motorcycleInitialFuel" class="form-label">Current Fuel Level (L)</label>
+                                            <input type="number" class="form-control" id="motorcycleInitialFuel" value="5.0" step="0.1" min="0">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="motorcycleFuelType" class="form-label">Fuel Type</label>
+                                            <select class="form-select" id="motorcycleFuelType">
+                                                <option value="92">92 Octane</option>
+                                                <option value="95">95 Octane</option>
+                                                <option value="98">98 Octane</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Passengers -->
+                                <div class="mb-3">
+                                    <label class="form-label">Number of Passengers</label>
+                                    <input type="number" class="form-control" id="passengers" min="1" value="1">
+                                </div>
+
+                                <!-- Budget -->
+                                <div class="mb-3">
+                                    <label class="form-label">Budget Range</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="minBudget" placeholder="Min">
+                                        <input type="number" class="form-control" id="maxBudget" placeholder="Max">
+                                        <select class="form-select" id="currency">
+                                            <option value="USD">USD</option>
+                                            <option value="EUR">EUR</option>
+                                            <option value="RUB">RUB</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Overnight Stay -->
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="overnightStay">
+                                        <label class="form-check-label">Include Overnight Stays</label>
+                                    </div>
+                                </div>
+
+                                <!-- Submit Button -->
+                                <button type="submit" class="btn btn-primary mt-3">Calculate Route</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column - Results -->
+                <div class="col-md-8">
+                    <!-- Map -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div id="map" style="height: 400px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Results Tabs -->
+                    <div class="card">
+                        <div class="card-body">
+                            <ul class="nav nav-tabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#routeDetails" type="button">Route</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#stopsTab" type="button">Stops</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#weatherTab" type="button">Weather</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#costsTab" type="button">Costs</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#healthTab" type="button">Health</button>
+                                </li>
+                            </ul>
+
+                            <div class="tab-content mt-3">
+                                <!-- Route Details Tab -->
+                                <div class="tab-pane fade show active" id="routeDetails" role="tabpanel">
+                                    <div id="routeDetailsContent"></div>
+                                </div>
+
+                                <!-- Stops Tab -->
+                                <div class="tab-pane fade" id="stopsTab" role="tabpanel">
+                                    <div id="stopsContent"></div>
+                                </div>
+
+                                <!-- Weather Tab -->
+                                <div class="tab-pane fade" id="weatherTab" role="tabpanel">
+                                    <div id="weatherContent"></div>
+                                    <canvas id="temperatureChart"></canvas>
+                                    <canvas id="precipitationChart"></canvas>
+                                </div>
+
+                                <!-- Costs Tab -->
+                                <div class="tab-pane fade" id="costsTab" role="tabpanel">
+                                    <div id="costsContent"></div>
+                                </div>
+
+                                <!-- Health Tab -->
+                                <div class="tab-pane fade" id="healthTab" role="tabpanel">
+                                    <div id="healthContent"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Share Button -->
+                    <button id="shareRouteButton" class="btn btn-success mt-3 d-none">
+                        <i class="bi bi-share"></i> Share Route
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="/js/vehicleForms.js" type="module"></script>
+    <script src="/js/app.js" type="module"></script>
+</body>
+</html>
