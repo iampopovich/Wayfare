@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TravelController } from './travel.controller';
 import { TravelService } from './travel.service';
-import { GoogleMapsRepository } from '../repositories/maps/google-maps.repository';
 import { OpenWeatherRepository } from '../repositories/weather/open-weather.repository';
 import { SearchService } from '../../services/search.service';
 
@@ -16,7 +15,6 @@ import { SearchService } from '../../services/search.service';
   providers: [
     TravelService,
     SearchService,
-    GoogleMapsRepository,
     OpenWeatherRepository,
   ],
   exports: [TravelService],

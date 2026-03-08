@@ -2,7 +2,6 @@ import { IsString, IsNumber, IsOptional, Min, Max, IsEnum } from 'class-validato
 import { Type } from 'class-transformer';
 
 export enum MapsSource {
-  GOOGLE = 'google',
   OSM = 'osm',
   ALL = 'all',
 }
@@ -31,12 +30,13 @@ export class SearchPlacesDto {
 
   @IsEnum(MapsSource)
   @IsOptional()
-  source?: MapsSource = MapsSource.ALL;
+  source?: MapsSource = MapsSource.OSM;
 }
 
 export class PlaceDetailsQueryDto {
   @IsString()
-  source?: string = 'google';
+  @IsOptional()
+  source?: string;
 }
 
 export class DirectionsQueryDto {

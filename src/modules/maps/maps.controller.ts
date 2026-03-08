@@ -36,7 +36,7 @@ export class MapsController {
   @ApiQuery({ name: 'latitude', required: false, type: Number, description: 'Latitude for location-based search' })
   @ApiQuery({ name: 'longitude', required: false, type: Number, description: 'Longitude for location-based search' })
   @ApiQuery({ name: 'radius', required: false, type: Number, description: 'Search radius in meters (max 50000)' })
-  @ApiQuery({ name: 'source', required: false, enum: ['google', 'osm', 'all'], description: 'Data source' })
+  @ApiQuery({ name: 'source', required: false, enum: ['osm', 'all'], description: 'Data source' })
   @ApiResponse({ 
     status: 200, 
     type: SearchResultDto,

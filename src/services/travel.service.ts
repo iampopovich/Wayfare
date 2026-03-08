@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BaseService } from './base.service';
-import { GoogleMapsRepository } from '../modules/repositories/maps/google-maps.repository';
+import { OSMRepository } from '../modules/repositories/maps/osm.repository';
 import { OpenWeatherRepository } from '../modules/repositories/weather/open-weather.repository';
 import { SearchService } from './search.service';
 import { TravelRequestDto } from '../models/travel/travel-request.dto';
@@ -34,11 +34,11 @@ export class TravelService extends BaseService {
 
   constructor(
     protected readonly configService: ConfigService,
-    private readonly mapsRepository: GoogleMapsRepository,
+    private readonly mapsRepository: OSMRepository,
     private readonly weatherRepository: OpenWeatherRepository,
     private readonly searchService: SearchService,
   ) {
-    super(configService, 'gpt-3.5-turbo', 0.7);
+    super(configService, 'deepseek-reasoner', 0.7);
   }
 
   /**
@@ -173,19 +173,23 @@ export class TravelService extends BaseService {
     passengers: number,
   ): Promise<TransportCostsDto> {
     const specs = request.carSpecifications || {
-      fuelConsumption: 7.5, // L/100km
+      fuelConsumption: 7.5,
       fuelType: 'gasoline',
       tankCapacity: 60,
       initialFuel: 60,
     };
 
-    const fuelNeeded = (specs.fuelConsumption * distanceKm) / 100;
-    const fuelPrice = this.FUEL_PRICES[specs.fuelType as keyof typeof this.FUEL_PRICES] || 1.5;
+    const fuelConsumption = specs.fuelConsumption || 7.5;
+    const fuelType = specs.fuelType || 'gasoline';
+    const tankCapacity = specs.tankCapacity || 60;
+    const initialFuel = specs.initialFuel || tankCapacity;
+
+    const fuelNeeded = (fuelConsumption * distanceKm) / 100;
+    const fuelPrice = this.FUEL_PRICES[fuelType as keyof typeof this.FUEL_PRICES] || 1.5;
     const fuelCost = fuelNeeded * fuelPrice;
 
     // Calculate refueling stops needed
-    const fuelPerTank = specs.tankCapacity;
-    const initialFuel = specs.initialFuel || specs.tankCapacity;
+    const fuelPerTank = tankCapacity;
     const fuelAfterTrip = initialFuel - fuelNeeded;
     const refuelingStops = fuelNeeded > initialFuel ? Math.ceil((fuelNeeded - initialFuel) / fuelPerTank) : 0;
 
@@ -245,45 +249,131 @@ export class TravelService extends BaseService {
   }
 
   /**
-   * Calculate recommended stops for the route
+   * Calculate recommended stops for the route based on segments
    */
   private async calculateStops(
     request: TravelRequestDto,
     route: IRoute,
   ): Promise<any[]> {
     const stops = [];
+    const distanceKm = route.totalDistance / 1000;
     const durationHours = route.totalDuration / 60;
 
-    // Add rest stops every 2 hours of driving
-    const restStopInterval = 2; // hours
-    const numRestStops = Math.floor(durationHours / restStopInterval);
+    // Calculate fuel stops based on vehicle type and tank capacity
+    let fuelStopInterval = 500; // km, default
+    if (request.transportationType === TransportationType.CAR && request.carSpecifications) {
+      const tankCapacity = request.carSpecifications.tankCapacity || 60;
+      const fuelConsumption = request.carSpecifications.fuelConsumption || 8;
+      fuelStopInterval = Math.floor((tankCapacity / fuelConsumption) * 100);
+    } else if (request.transportationType === TransportationType.MOTORCYCLE && request.motorcycleSpecifications) {
+      const tankCapacity = request.motorcycleSpecifications.tankCapacity || 15;
+      const fuelConsumption = request.motorcycleSpecifications.fuelConsumption || 5;
+      fuelStopInterval = Math.floor((tankCapacity / fuelConsumption) * 100);
+    }
 
-    for (let i = 1; i <= numRestStops; i++) {
-      const stopTime = (route.totalDuration / (numRestStops + 1)) * i;
+    // Calculate rest stops (every 2-3 hours or 200km)
+    const restStopIntervalHours = 2.5;
+    const restStopIntervalKm = 200;
+
+    let accumulatedDistance = 0;
+    let accumulatedTime = 0;
+    let distanceSinceLastFuelStop = 0;
+    let timeSinceLastRestStop = 0;
+
+    for (const segment of route.segments) {
+      accumulatedDistance += segment.distance;
+      accumulatedTime += segment.duration;
+      distanceSinceLastFuelStop += segment.distance;
+      timeSinceLastRestStop += segment.duration;
+
+      const accumulatedDistanceKm = accumulatedDistance / 1000;
+      const distanceSinceFuelKm = distanceSinceLastFuelStop / 1000;
+      const timeSinceRestHours = timeSinceLastRestStop / 60;
+
+      // Check for fuel stop needed
+      if (distanceSinceFuelKm >= fuelStopInterval && 
+          (request.transportationType === TransportationType.CAR || 
+           request.transportationType === TransportationType.MOTORCYCLE)) {
+        
+        const gasStations = await this.searchService.searchPlaces({
+          query: 'gas station',
+          latitude: segment.endLocation.latitude,
+          longitude: segment.endLocation.longitude,
+          radius: 3000,
+        });
+
+        if (gasStations.results.length > 0) {
+          stops.push({
+            type: 'fuel',
+            location: {
+              latitude: segment.endLocation.latitude,
+              longitude: segment.endLocation.longitude,
+              address: segment.endLocation.address,
+            },
+            distanceFromStart: accumulatedDistanceKm.toFixed(1),
+            estimatedTime: this.formatTime(accumulatedTime),
+            placeDetails: gasStations.results[0],
+          });
+          distanceSinceLastFuelStop = 0;
+        }
+      }
+
+      // Check for rest stop needed
+      if (timeSinceRestHours >= restStopIntervalHours) {
+        const restAreas = await this.searchService.searchPlaces({
+          query: 'rest area',
+          latitude: segment.endLocation.latitude,
+          longitude: segment.endLocation.longitude,
+          radius: 2000,
+        });
+
+        if (restAreas.results.length > 0) {
+          stops.push({
+            type: 'rest',
+            location: {
+              latitude: segment.endLocation.latitude,
+              longitude: segment.endLocation.longitude,
+              address: segment.endLocation.address,
+            },
+            distanceFromStart: accumulatedDistanceKm.toFixed(1),
+            estimatedTime: this.formatTime(accumulatedTime),
+            duration: 20,
+            placeDetails: restAreas.results[0],
+          });
+          timeSinceLastRestStop = 0;
+        }
+      }
+    }
+
+    // Add food stops near major cities (every 4-5 hours)
+    const foodInterval = 4.5;
+    const numFoodStops = Math.floor(durationHours / foodInterval);
+    
+    for (let i = 1; i <= numFoodStops; i++) {
+      const targetTime = (durationHours * i / numFoodStops) * 60;
+      let currentTime = 0;
       
-      // Find the route segment at this time
-      let accumulatedTime = 0;
       for (const segment of route.segments) {
-        accumulatedTime += segment.duration;
-        if (accumulatedTime >= stopTime) {
-          // Search for rest stops near this location
-          const restStops = await this.searchService.searchPlaces({
-            query: 'rest area',
+        currentTime += segment.duration;
+        if (currentTime >= targetTime) {
+          const restaurants = await this.searchService.searchPlaces({
+            query: 'restaurant',
             latitude: segment.endLocation.latitude,
             longitude: segment.endLocation.longitude,
-            radius: 5000, // 5km
+            radius: 5000,
           });
 
-          if (restStops.results.length > 0) {
+          if (restaurants.results.length > 0) {
             stops.push({
+              type: 'food',
               location: {
                 latitude: segment.endLocation.latitude,
                 longitude: segment.endLocation.longitude,
+                address: segment.endLocation.address,
               },
-              type: 'rest',
-              duration: 15, // minutes
-              facilities: ['parking', 'restroom'],
-              placeDetails: restStops.results[0],
+              distanceFromStart: (segment.distance / 1000).toFixed(1),
+              estimatedTime: this.formatTime(currentTime),
+              placeDetails: restaurants.results[0],
             });
           }
           break;
@@ -291,7 +381,19 @@ export class TravelService extends BaseService {
       }
     }
 
+    // Sort stops by distance from start
+    stops.sort((a, b) => parseFloat(a.distanceFromStart) - parseFloat(b.distanceFromStart));
+
     return stops;
+  }
+
+  /**
+   * Format minutes to HH:MM
+   */
+  private formatTime(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   }
 
   /**
@@ -364,7 +466,7 @@ export class TravelService extends BaseService {
   }
 
   /**
-   * Generate AI-powered recommendations for the trip
+   * Generate AI-powered recommendations for the trip with specific route points
    */
   private async generateRecommendations(
     request: TravelRequestDto,
@@ -375,17 +477,62 @@ export class TravelService extends BaseService {
       const distanceKm = route.totalDistance / 1000;
       const durationHours = route.totalDuration / 60;
 
+      // Build route waypoints summary - include origin and all segment points
+      const waypoints: string[] = [];
+      waypoints.push(`Origin: ${request.origin}`);
+      
+      // Add intermediate waypoints from path points (sample every 100km)
+      const pathPoints = route.pathPoints;
+      const sampleInterval = Math.max(1, Math.floor(pathPoints.length / 10));
+      
+      for (let i = sampleInterval; i < pathPoints.length - 1; i += sampleInterval) {
+        const [lat, lon] = pathPoints[i];
+        waypoints.push(`Via: (${lat.toFixed(2)}, ${lon.toFixed(2)})`);
+      }
+      
+      waypoints.push(`Destination: ${request.destination}`);
+
+      // Build vehicle info
+      let vehicleInfo = '';
+      if (request.transportationType === TransportationType.CAR && request.carSpecifications) {
+        const specs = request.carSpecifications;
+        vehicleInfo = `
+        Vehicle: Car (${specs.model || 'N/A'})
+        Fuel type: ${specs.fuelType || 'gasoline'}
+        Fuel consumption: ${specs.fuelConsumption || 8} L/100km
+        Tank capacity: ${specs.tankCapacity || 60} L
+        Initial fuel: ${specs.initialFuel || specs.tankCapacity || 60} L
+        `;
+      } else if (request.transportationType === TransportationType.MOTORCYCLE && request.motorcycleSpecifications) {
+        const specs = request.motorcycleSpecifications;
+        vehicleInfo = `
+        Vehicle: Motorcycle (${specs.model || 'N/A'})
+        Fuel type: ${specs.fuelType || 'gasoline'}
+        Fuel consumption: ${specs.fuelConsumption || 5} L/100km
+        Tank capacity: ${specs.tankCapacity || 15} L
+        Initial fuel: ${specs.initialFuel || specs.tankCapacity || 15} L
+        `;
+      }
+
       const prompt = `
-        Provide 3-5 brief travel recommendations for a trip with these details:
-        - From: ${request.origin}
-        - To: ${request.destination}
-        - Transportation: ${request.transportationType}
-        - Distance: ${distanceKm.toFixed(0)} km
-        - Duration: ${durationHours.toFixed(1)} hours
-        - Estimated cost: $${costs.totalCost.toFixed(2)}
-        - Passengers: ${request.passengers || 1}
+        Analyze this specific route and provide 3-5 practical recommendations:
         
-        Consider: rest stops, safety, weather, and cost-saving tips.
+        Route: ${request.origin} → ${request.destination}
+        Transportation: ${request.transportationType}
+        Total distance: ${distanceKm.toFixed(0)} km
+        Total duration: ${durationHours.toFixed(1)} hours
+        Estimated cost: $${costs.totalCost.toFixed(2)}
+        Passengers: ${request.passengers || 1}
+        Vehicle info : ${vehicleInfo}
+        
+        Route path:
+        ${waypoints.join('\n')}
+        
+        Provide specific recommendations for:
+        - Where to stop (reference actual cities/points along the route)
+        - When to refuel (calculate based on fuel consumption and tank capacity)
+        - Safety considerations for this specific route
+        
         Format as a JSON array of strings.
       `;
 
@@ -403,20 +550,21 @@ export class TravelService extends BaseService {
 
   /**
    * Get travel mode string for maps API
+   * OSRM supports: car, bike, foot
    */
   private getTravelMode(transportType: TransportationType): string {
     const modeMap: Record<TransportationType, string> = {
-      [TransportationType.CAR]: 'driving',
-      [TransportationType.MOTORCYCLE]: 'driving',
-      [TransportationType.BUS]: 'driving',
-      [TransportationType.TRAIN]: 'transit',
-      [TransportationType.WALKING]: 'walking',
-      [TransportationType.BICYCLE]: 'bicycling',
-      [TransportationType.FERRY]: 'driving', // Ferry routes included in driving
-      [TransportationType.PLANE]: 'flying', // Not supported by Maps API
+      [TransportationType.CAR]: 'car',
+      [TransportationType.MOTORCYCLE]: 'car',
+      [TransportationType.BUS]: 'car',
+      [TransportationType.TRAIN]: 'car', // No transit in OSRM, use car as fallback
+      [TransportationType.WALKING]: 'foot',
+      [TransportationType.BICYCLE]: 'bike',
+      [TransportationType.FERRY]: 'car',
+      [TransportationType.PLANE]: 'car', // Not supported, use car as fallback
     };
 
-    return modeMap[transportType] || 'driving';
+    return modeMap[transportType] || 'car';
   }
 
   /**

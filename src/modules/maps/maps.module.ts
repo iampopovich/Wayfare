@@ -3,7 +3,6 @@ import { ConfigModule } from '@nestjs/config';
 import { MapsController } from './maps.controller';
 import { MapsService } from './maps.service';
 import { MapsProvider } from './maps.provider';
-import { GoogleMapsRepository } from '../repositories/maps/google-maps.repository';
 import { OSMRepository } from '../repositories/maps/osm.repository';
 
 /**
@@ -16,7 +15,6 @@ import { OSMRepository } from '../repositories/maps/osm.repository';
   providers: [
     MapsService,
     MapsProvider,
-    GoogleMapsRepository,
     OSMRepository,
   ],
   exports: [MapsService],

@@ -18,7 +18,7 @@ Wayfare is an intelligent travel planning application that uses AI agents to cre
 - **Validation:** class-validator, class-transformer
 - **AI/LLM:** LangChain.js, OpenAI
 - **HTTP Client:** Axios
-- **Maps:** Google Maps API, OpenStreetMap
+- **Maps:** OpenStreetMap
 - **Weather:** OpenWeatherMap
 - **Documentation:** Swagger/OpenAPI
 
@@ -107,11 +107,9 @@ PORT=3000
 HOST=0.0.0.0
 NODE_ENV=development
 
-# OpenAI
-OPENAI_API_KEY=your-api-key-here
-
-# Maps
-GOOGLE_MAPS_API_KEY=your-google-maps-key
+# DeepSeek
+DEEPSEEK_API_KEY=your-api-key-here
+DEEPSEEK_MODEL_NAME=deepseek-chat
 
 # Weather
 OPENWEATHER_API_KEY=your-openweather-key

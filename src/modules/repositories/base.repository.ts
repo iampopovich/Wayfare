@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatOpenAI } from '@langchain/openai';
-import { LLMChain } from 'langchain/chains';
-import { PromptTemplate } from '@langchain/core/prompts';
 
 export interface ISearchOptions {
   query: string;
@@ -33,59 +31,47 @@ export interface ILocation {
 export abstract class BaseRepository {
   protected readonly logger = new Logger('BaseRepository');
   protected llm: ChatOpenAI;
-  protected parserChain: LLMChain;
 
   constructor(
     protected readonly configService: ConfigService,
     apiKey?: string,
-    modelName: string = 'gpt-3.5-turbo',
+    modelName: string = 'deepseek-chat',
   ) {
-    const openAiKey = apiKey || this.configService.get<string>('OPENAI_API_KEY');
-    
-    if (openAiKey) {
+    const deepSeekKey = apiKey || this.configService.get<string>('DEEPSEEK_API_KEY');
+
+    if (deepSeekKey) {
       this.llm = new ChatOpenAI({
-        openAIApiKey: openAiKey,
+        openAIApiKey: deepSeekKey,
         modelName,
         temperature: 0.7,
+        configuration: {
+          baseURL: 'https://api.deepseek.com',
+        },
       });
-      this._setupChains();
     }
-  }
-
-  protected _setupChains(): void {
-    this.parserChain = new LLMChain({
-      llm: this.llm as any,
-      prompt: PromptTemplate.fromTemplate(`
-        Parse the following content into a structured JSON format:
-        {content}
-
-        Extract key details like names, addresses, prices, ratings, and amenities.
-        Return ONLY a valid JSON object, no additional text.
-      `),
-    });
   }
 
   /**
    * Parse unstructured text into structured data using LLM
    */
   protected async parseWithLLM<T>(content: string): Promise<T> {
-    if (!this.parserChain) {
-      throw new Error('LLM chain not initialized');
-    }
+    const prompt = `Parse the following content into a structured JSON format:\n${content}\n\nExtract key details like names, addresses, prices, ratings, and amenities. Return ONLY a valid JSON object, no additional text.`;
 
-    const { text } = await this.parserChain.call({ content });
-    
-    try {
-      // Extract JSON from the response
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]) as T;
-      }
-      throw new Error('No JSON found in LLM response');
-    } catch (error) {
-      this.logger.error(`Failed to parse LLM response: ${error.message}`);
-      throw error;
-    }
+    this.logger.debug(`Repository LLM Request: ${prompt}`);
+
+    const response = await this.llm.invoke([
+      ['human', prompt]
+    ]);
+
+    this.logger.debug(`Repository LLM Response: ${response.content}`);
+
+    const aiContent = response.content as string;
+
+    // Extract JSON from markdown code blocks if present
+    const jsonMatch = aiContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const jsonContent = jsonMatch ? jsonMatch[1].trim() : aiContent;
+
+    return JSON.parse(jsonContent) as T;
   }
 
   /**

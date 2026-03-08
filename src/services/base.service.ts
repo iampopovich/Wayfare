@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ChatOpenAI } from '@langchain/openai';
-import { LLMChain } from 'langchain/chains';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { ChatDeepSeek } from '@langchain/deepseek';
 
 /**
  * Base service for all business logic services
@@ -11,77 +9,65 @@ import { PromptTemplate } from '@langchain/core/prompts';
 @Injectable()
 export abstract class BaseService {
   protected logger = new Logger('BaseService');
-  protected llm: ChatOpenAI;
-  protected chain: LLMChain;
+  protected llm: ChatDeepSeek;
 
   constructor(
     protected readonly configService: ConfigService,
-    modelName: string = 'gpt-3.5-turbo',
+    modelName: string = 'deepseek-chat',
     temperature: number = 0.7,
   ) {
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
-    
+    const apiKey = this.configService.get<string>('DEEPSEEK_API_KEY');
+
     if (!apiKey) {
-      this.logger.warn('OpenAI API key not configured');
+      this.logger.warn('DeepSeek API key not configured');
       return;
     }
 
-    this.llm = new ChatOpenAI({
-      openAIApiKey: apiKey,
-      modelName,
+    this.llm = new ChatDeepSeek({
+      apiKey: apiKey,
+      model: modelName,
       temperature,
     });
-
-    this._setupChain();
-  }
-
-  protected _setupChain(): void {
-    // Default chain setup - can be overridden by subclasses
-    this.chain = new LLMChain({
-      llm: this.llm as any,
-      prompt: PromptTemplate.fromTemplate(`
-        You are a helpful travel planning assistant.
-
-        Question: {question}
-
-        Answer:
-      `),
-    });
   }
 
   /**
-   * Execute a prompt with the LLM
-   */
-  protected async executePrompt(prompt: string, variables: Record<string, any> = {}): Promise<string> {
-    if (!this.chain) {
-      throw new Error('LLM chain not initialized');
-    }
-
-    try {
-      const { text } = await this.chain.call(variables);
-      return text.trim();
-    } catch (error) {
-      this.logger.error(`LLM execution error: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Parse JSON response from LLM
+   * Execute a prompt and parse JSON response
    */
   protected async executeAndParseJSON(prompt: string, variables: Record<string, any> = {}): Promise<any> {
-    const response = await this.executePrompt(prompt, variables);
+    const fullPrompt = variables 
+      ? `${prompt}\n\n${JSON.stringify(variables)}`
+      : prompt;
+
+    this.logger.debug(`LLM Request: ${fullPrompt}`);
+
+    const response = await this.llm.invoke([
+      ['system', 'You are a helpful assistant. Respond in JSON format.'],
+      ['human', fullPrompt]
+    ]);
+
+    this.logger.debug(`LLM Response: ${response.content}`);
+
+    const content = response.content as string;
     
-    try {
-      // Extract JSON from the response
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error('No JSON found in LLM response');
-    } catch (error) {
-      this.logger.error(`Failed to parse LLM JSON response: ${error.message}`);
-      throw error;
-    }
+    // Extract JSON from markdown code blocks if present
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const jsonContent = jsonMatch ? jsonMatch[1].trim() : content;
+    
+    return JSON.parse(jsonContent);
+  }
+
+  /**
+   * Execute a simple prompt
+   */
+  protected async executePrompt(prompt: string): Promise<string> {
+    this.logger.debug(`LLM Request: ${prompt}`);
+
+    const response = await this.llm.invoke([
+      ['human', prompt]
+    ]);
+
+    this.logger.debug(`LLM Response: ${response.content}`);
+
+    return response.content as string;
   }
 }

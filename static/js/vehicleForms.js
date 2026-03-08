@@ -46,25 +46,25 @@ class VehicleFormManager {
     getCarSpecifications() {
         return {
             model: document.getElementById('carModel').value || 'Standard 1.6L',
-            engine_volume: parseFloat(document.getElementById('engineVolume').value) || 1.6,
-            fuel_consumption: parseFloat(document.getElementById('fuelConsumption').value) || 11.0,
-            fuel_type: document.getElementById('fuelType').value || 'gasoline',
-            tank_capacity: parseFloat(document.getElementById('tankCapacity').value) || 50.0,
-            initial_fuel: parseFloat(document.getElementById('initialFuel').value) || 25.0,
-            base_mass: 1200.0,
+            engineVolume: parseFloat(document.getElementById('engineVolume').value) || 1.6,
+            fuelConsumption: parseFloat(document.getElementById('fuelConsumption').value) || 11.0,
+            fuelType: document.getElementById('fuelType').value || 'gasoline',
+            tankCapacity: parseFloat(document.getElementById('tankCapacity').value) || 50.0,
+            initialFuel: parseFloat(document.getElementById('initialFuel').value) || 25.0,
+            baseMass: 1200.0,
             passenger_mass: 75.0
         };
     }
 
     getMotorcycleSpecifications() {
         return {
-            engine_cc: parseFloat(document.getElementById('engineCC').value) || 125,
-            fuel_economy: parseFloat(document.getElementById('motorcycleFuelConsumption').value) || 45,
-            tank_capacity: parseFloat(document.getElementById('motorcycleTankCapacity').value) || 10.0,
-            initial_fuel: parseFloat(document.getElementById('motorcycleInitialFuel').value) || 5.0,
-            fuel_type: document.getElementById('motorcycleFuelType').value || '92',
-            base_mass: 150.0,
-            passenger_mass: 75.0
+            engineCC: parseFloat(document.getElementById('engineCC').value) || 125,
+            fuelEconomy: parseFloat(document.getElementById('motorcycleFuelConsumption').value) || 45,
+            tankCapacity: parseFloat(document.getElementById('motorcycleTankCapacity').value) || 10.0,
+            initialFuel: parseFloat(document.getElementById('motorcycleInitialFuel').value) || 5.0,
+            fuelType: document.getElementById('motorcycleFuelType').value || '92',
+            baseMass: 150.0,
+            passengerMass: 75.0
         };
     }
 
@@ -88,8 +88,8 @@ class VehicleFormManager {
         if (!specs) return 0;
 
         const fuelNeeded = this.calculateFuelNeeded(distance, type);
-        const remainingFuel = specs.initial_fuel - fuelNeeded;
-        return Math.max(0, Math.ceil(-remainingFuel / specs.tank_capacity));
+        const remainingFuel = specs.initialFuel - fuelNeeded;
+        return Math.max(0, Math.ceil(-remainingFuel / specs.tankCapacity));
     }
 }
 

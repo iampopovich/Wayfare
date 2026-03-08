@@ -27,15 +27,17 @@ export class OSMRepository extends BaseMapsRepository {
 
   async geocode(address: string): Promise<ILocation> {
     try {
+      this.logger.log(`Geocoding address: "${address}"`);
       const response = await this.httpClient.get('/search', {
         params: { q: address, format: 'json', limit: 1 },
       });
 
       if (!response.data || response.data.length === 0) {
-        throw new Error('No results found');
+        throw new Error(`No geocoding results found for "${address}"`);
       }
 
       const result = response.data[0];
+      this.logger.log(`Geocoded "${address}" to: ${result.lat},${result.lon}`);
       return {
         latitude: parseFloat(result.lat),
         longitude: parseFloat(result.lon),
@@ -55,25 +57,30 @@ export class OSMRepository extends BaseMapsRepository {
     waypoints?: ILocation[],
   ): Promise<IRoute> {
     // OSM routing via OSRM (Open Source Routing Machine)
-    const coordinates = [
-      origin.longitude,
-      origin.latitude,
-      destination.longitude,
-      destination.latitude,
-    ].join(';');
+    // OSRM expects coordinates in longitude,latitude;longitude,latitude format
+    const coordinates = `${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}`;
 
-    const response = await axios.get(
-      `http://router.project-osrm.org/route/v1/${mode}/${coordinates}`,
-      {
-        params: { overview: 'full', geometries: 'geojson' },
-      },
-    );
+    try {
+      this.logger.log(`Requesting OSRM route: ${mode}/${coordinates}`);
+      const response = await axios.get(
+        `http://router.project-osrm.org/route/v1/${mode}/${coordinates}`,
+        {
+          params: { overview: 'full', geometries: 'geojson' },
+        },
+      );
 
-    if (!response.data.routes || response.data.routes.length === 0) {
-      throw new Error('No route found');
+      if (!response.data.routes || response.data.routes.length === 0) {
+        throw new Error('No route found');
+      }
+
+      this.logger.log(`OSRM route found: ${response.data.routes[0].distance}m, ${response.data.routes[0].duration}s`);
+      return this.transformRoute(response.data.routes[0], origin, destination);
+    } catch (error) {
+      this.logger.error(
+        `OSRM routing error: ${error.message}. Origin: ${origin.latitude},${origin.longitude}, Destination: ${destination.latitude},${destination.longitude}`,
+      );
+      throw new Error(`Routing failed: ${error.response?.status ? `HTTP ${error.response.status}` : error.message}`);
     }
-
-    return this.transformRoute(response.data.routes[0], origin, destination);
   }
 
   async searchPlaces(options: ISearchOptions): Promise<ISearchResult> {

@@ -1,6 +1,5 @@
 import { Module, Global } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { GoogleMapsRepository } from './maps/google-maps.repository';
 import { OSMRepository } from './maps/osm.repository';
 import { MapsMeRepository } from './maps/mapsme.repository';
 import { BookingRepository } from './travel/booking.repository';
@@ -17,7 +16,6 @@ import { OpenWeatherRepository } from './weather/open-weather.repository';
   imports: [ConfigModule],
   providers: [
     // Maps repositories
-    GoogleMapsRepository,
     OSMRepository,
     MapsMeRepository,
 
@@ -31,7 +29,6 @@ import { OpenWeatherRepository } from './weather/open-weather.repository';
   ],
   exports: [
     // Export repositories for use in other modules
-    GoogleMapsRepository,
     OSMRepository,
     MapsMeRepository,
     BookingRepository,

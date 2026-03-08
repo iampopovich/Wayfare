@@ -12,7 +12,7 @@ import { HealthModule } from './modules/health/health.module';
 
 // Import configuration
 import appConfig from './config/app.config';
-import openaiConfig from './config/openai.config';
+import deepseekConfig from './config/deepseek.config';
 import mapsConfig from './config/maps.config';
 import travelConfig from './config/travel.config';
 import { validate } from './config/config.validation';
@@ -23,7 +23,7 @@ import { validate } from './config/config.validation';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
-      load: [appConfig, openaiConfig, mapsConfig, travelConfig],
+      load: [appConfig, deepseekConfig, mapsConfig, travelConfig],
       validate,
     }),
 
