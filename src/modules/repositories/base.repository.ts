@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ChatOpenAI } from '@langchain/openai';
+import { ChatDeepSeek } from '@langchain/deepseek';
 
 export interface ISearchOptions {
   query: string;
@@ -30,7 +30,7 @@ export interface ILocation {
 @Injectable()
 export abstract class BaseRepository {
   protected readonly logger = new Logger('BaseRepository');
-  protected llm: ChatOpenAI;
+  protected llm: ChatDeepSeek;
 
   constructor(
     protected readonly configService: ConfigService,
@@ -40,13 +40,10 @@ export abstract class BaseRepository {
     const deepSeekKey = apiKey || this.configService.get<string>('DEEPSEEK_API_KEY');
 
     if (deepSeekKey) {
-      this.llm = new ChatOpenAI({
-        openAIApiKey: deepSeekKey,
-        modelName,
+      this.llm = new ChatDeepSeek({
+        apiKey: deepSeekKey,
+        model: modelName,
         temperature: 0.7,
-        configuration: {
-          baseURL: 'https://api.deepseek.com',
-        },
       });
     }
   }

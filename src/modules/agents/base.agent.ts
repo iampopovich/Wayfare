@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ChatOpenAI } from '@langchain/openai';
+import { ChatDeepSeek } from '@langchain/deepseek';
 
 /**
  * Base response interface for all agents
@@ -19,7 +19,7 @@ export interface AgentResponse<T = any> {
 @Injectable()
 export abstract class BaseAgent {
   protected readonly logger = new Logger(BaseAgent.name);
-  protected llm: ChatOpenAI;
+  protected llm: ChatDeepSeek;
 
   constructor(
     protected readonly configService: ConfigService,
@@ -33,13 +33,10 @@ export abstract class BaseAgent {
       return;
     }
 
-    this.llm = new ChatOpenAI({
-      openAIApiKey: apiKey,
-      modelName,
+    this.llm = new ChatDeepSeek({
+      apiKey,
+      model: modelName,
       temperature,
-      configuration: {
-        baseURL: 'https://api.deepseek.com',
-      },
     });
   }
 

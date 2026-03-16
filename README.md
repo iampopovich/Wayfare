@@ -13,7 +13,8 @@ Wayfare is an intelligent travel planning application that uses AI agents to cre
 
 ## Tech Stack
 
-- **Framework:** NestJS 10+
+- **Backend:** NestJS 10+
+- **Frontend:** Vue 3 + TypeScript + Vite
 - **Language:** TypeScript 5+
 - **Validation:** class-validator, class-transformer
 - **AI/LLM:** LangChain.js, OpenAI
@@ -21,6 +22,9 @@ Wayfare is an intelligent travel planning application that uses AI agents to cre
 - **Maps:** OpenStreetMap
 - **Weather:** OpenWeatherMap
 - **Documentation:** Swagger/OpenAPI
+- **UI Components:** PrimeVue 4
+- **State Management:** Pinia
+- **Routing:** Vue Router
 
 ## Installation
 
@@ -31,12 +35,13 @@ npm install
 ## Running the App
 
 ```bash
-# Development mode (with hot-reload)
-npm run start:dev
+# Development mode (backend + frontend)
+npm run start:dev        # Start NestJS backend
+npm run dev:vue          # Start Vite dev server (in separate terminal)
 
 # Production mode
-npm run build
-npm run start:prod
+npm run build            # Build both frontend and backend
+npm run start:prod       # Start production server
 
 # Debug mode
 npm run start:debug
@@ -49,8 +54,26 @@ Once the application is running, access the interactive API documentation at:
 
 ## Frontend
 
-The web interface is available at:
-- **Application:** http://localhost:3000/
+The Vue 3 web interface is available at:
+- **Development:** http://localhost:3000/ (Vite dev server)
+- **Production:** http://localhost:3000/ (served by NestJS)
+
+For detailed frontend documentation, see [src/frontend/README.md](src/frontend/README.md)
+
+### Frontend Structure
+
+```
+src/frontend/
+├── assets/          # Static files (CSS, images)
+├── components/      # Reusable Vue components
+├── router/          # Vue Router configuration
+├── services/        # API services (Axios)
+├── stores/          # Pinia state management
+├── views/           # Page components
+├── App.vue          # Root component
+├── main.ts          # Entry point
+└── index.html       # HTML template
+```
 
 ## API Endpoints
 
@@ -90,7 +113,13 @@ wayfare/
 │   │   ├── repositories/          # Data access layer
 │   │   └── health/                # Health checks
 │   └── services/                  # Business logic services
-├── public/                        # Static files (frontend)
+├── src/frontend/                  # Vue 3 application
+│   ├── assets/                    # Static files
+│   ├── components/                # Reusable components
+│   ├── router/                    # Vue Router config
+│   ├── services/                  # API services
+│   ├── stores/                    # Pinia stores
+│   └── views/                     # Page components
 ├── test/                          # Tests
 │   ├── unit/
 │   └── e2e/
@@ -140,8 +169,17 @@ npm run format
 # Lint code
 npm run lint
 
-# Build for production
+# Build frontend
+npm run build:vue
+
+# Build backend
 npm run build
+
+# Build both frontend and backend
+npm run build
+
+# Start Vite dev server (frontend)
+npm run dev:vue
 ```
 
 ## License
