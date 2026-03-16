@@ -1,7 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
 
 // Import modules
 import { MapsModule } from './modules/maps/maps.module';
@@ -25,12 +23,6 @@ import { validate } from './config/config.validation';
       envFilePath: ['.env.local', '.env'],
       load: [appConfig, deepseekConfig, mapsConfig, travelConfig],
       validate,
-    }),
-
-    // Static files module
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'public'),
-      exclude: ['/api*'],
     }),
 
     // Feature modules

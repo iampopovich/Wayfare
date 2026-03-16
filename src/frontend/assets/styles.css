@@ -1,0 +1,243 @@
+/* Global styles for Wayfare Vue frontend */
+
+:root {
+  --bg:          #f0f2f7;
+  --surface:     #ffffff;
+  --surface-2:   #f7f8fc;
+  --border:      #dde3ee;
+  --text:        #2c3a4a;
+  --text-muted:  #7a8899;
+  --accent:      #4a7eb5;
+  --accent-soft: #e8f0fa;
+  --danger-bg:   #fce8e8;
+  --danger-text: #8b2a2a;
+  --danger-border: #f0c6c6;
+  --success-bg:  #e6f4ed;
+  --success-text: #1d6840;
+  --success-border: #b8dfc9;
+  --shadow:      0 1px 4px rgba(44, 58, 74, 0.08);
+  --radius:      0.5rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text);
+  background-color: var(--bg);
+}
+
+/* Utility classes */
+.alert {
+  padding: 0.875rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  font-size: 0.9rem;
+}
+
+.alert-danger {
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+}
+
+.alert-success {
+  background-color: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.card-body {
+  padding: 1.25rem;
+}
+
+.card-title {
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Form styles */
+.form-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-check-input {
+  width: auto;
+}
+
+/* Layout utilities */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -12px;
+}
+
+[class^='col-'] {
+  padding: 0 12px;
+}
+
+/* Responsive columns */
+@media (min-width: 768px) {
+  .col-md-4 {
+    flex: 0 0 33.333333%;
+    max-width: 33.333333%;
+  }
+
+  .col-md-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+
+  .col-md-8 {
+    flex: 0 0 66.666667%;
+    max-width: 66.666667%;
+  }
+}
+
+.col-12 {
+  flex: 0 0 100%;
+  max-width: 100%;
+}
+
+/* Spacing utilities */
+.mb-3 {
+  margin-bottom: 1rem;
+}
+
+.mt-3 {
+  margin-top: 1rem;
+}
+
+.g-3 {
+  gap: 1rem;
+}
+
+/* Width utilities */
+.w-100 {
+  width: 100%;
+}
+
+.flex-grow-1 {
+  flex: 1;
+}
+
+.input-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* PrimeVue overrides */
+.p-dropdown,
+.p-inputtext,
+.p-inputnumber-input,
+.p-button {
+  width: 100%;
+}
+
+.p-inputtext,
+.p-inputnumber-input,
+.p-dropdown {
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+  border-radius: calc(var(--radius) - 2px) !important;
+  font-size: 0.9rem !important;
+}
+
+.p-inputtext:focus,
+.p-inputnumber-input:focus,
+.p-dropdown:focus,
+.p-dropdown.p-focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(74, 126, 181, 0.15) !important;
+}
+
+.p-dropdown-label {
+  color: var(--text) !important;
+  font-size: 0.9rem !important;
+}
+
+.p-dropdown-item {
+  color: var(--text) !important;
+  font-size: 0.9rem !important;
+}
+
+.p-dropdown-item:hover {
+  background: var(--accent-soft) !important;
+}
+
+.p-button {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+  font-size: 0.9rem !important;
+  border-radius: calc(var(--radius) - 2px) !important;
+  transition: background 0.2s, box-shadow 0.2s !important;
+}
+
+.p-button:hover {
+  background: #3a6fa0 !important;
+  border-color: #3a6fa0 !important;
+  box-shadow: 0 2px 8px rgba(74, 126, 181, 0.3) !important;
+}
+
+.p-button-success {
+  background: #4a9a6e !important;
+  border-color: #4a9a6e !important;
+}
+
+.p-button-success:hover {
+  background: #3b8860 !important;
+  border-color: #3b8860 !important;
+}
+
+.p-tabview-nav {
+  background: var(--surface-2) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.p-tabview-nav-link {
+  color: var(--text-muted) !important;
+  font-size: 0.875rem !important;
+}
+
+.p-tabview-nav li.p-highlight .p-tabview-nav-link {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent) !important;
+}
+
+.p-tabview-panels {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+}
+
+/* Map container */
+#map {
+  border-radius: calc(var(--radius) - 2px);
+}
