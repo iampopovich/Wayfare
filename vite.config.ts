@@ -9,6 +9,36 @@ export default defineConfig({
   build: {
     outDir: '../../dist-frontend',
     emptyOutDir: true,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('/vue/') || id.includes('/vue-router/') || id.includes('/pinia/')) {
+              return 'vendor';
+            }
+            if (id.includes('/leaflet/')) {
+              return 'maps';
+            }
+            if (id.includes('/primevue/') || id.includes('/@primevue/')) {
+              return 'ui';
+            }
+          }
+        },
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
+      },
+    },
+    target: 'esnext',
+    cssCodeSplit: true,
+    assetsInlineLimit: 4096,
   },
   resolve: {
     alias: {
@@ -23,5 +53,9 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  optimizeDeps: {
+    include: ['vue', 'vue-router', 'pinia', 'axios', 'leaflet'],
+    exclude: ['@primevue/themes'],
   },
 })

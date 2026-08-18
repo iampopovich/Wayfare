@@ -85,17 +85,19 @@ export class OSMRepository extends BaseMapsRepository {
 
   async searchPlaces(options: ISearchOptions): Promise<ISearchResult> {
     try {
-      const response = await this.httpClient.get('/search', {
-        params: {
-          q: options.query,
-          format: 'json',
-          limit: options.filters?.limit || 20,
-          ...(options.location && {
-            viewbox: `${options.location.longitude - 0.1},${options.location.latitude + 0.1},${options.location.longitude + 0.1},${options.location.latitude - 0.1}`,
-            bounded: 1,
-          }),
-        },
-      });
+      const limit = options.filters?.limit || 20;
+      const params: any = {
+        q: options.query,
+        format: 'json',
+        limit,
+      };
+
+      if (options.location) {
+        params.viewbox = `${options.location.longitude - 0.1},${options.location.latitude + 0.1},${options.location.longitude + 0.1},${options.location.latitude - 0.1}`;
+        params.bounded = 1;
+      }
+
+      const response = await this.httpClient.get('/search', { params });
 
       return {
         items: response.data.map(this.transformPlace.bind(this)),
