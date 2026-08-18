@@ -51,19 +51,15 @@ export class TravelService extends BaseService {
       // Step 1: Get route from maps
       const route = await this.getRoute(request);
 
-      // Step 2: Calculate transport costs
-      const transportCosts = await this.calculateTransportCosts(request, route);
+      // Step 2-6: Execute independent operations in parallel
+      const [transportCosts, stops, health, weather] = await Promise.all([
+        this.calculateTransportCosts(request, route),
+        this.calculateStops(request, route),
+        this.calculateCalories(request, route),
+        this.getWeatherForRoute(route),
+      ]);
 
-      // Step 3: Calculate stops if needed
-      const stops = await this.calculateStops(request, route);
-
-      // Step 4: Calculate calories for active transport
-      const health = await this.calculateCalories(request, route);
-
-      // Step 5: Get weather forecast for the route
-      const weather = await this.getWeatherForRoute(route);
-
-      // Step 6: Use AI to generate recommendations
+      // Step 7: Use AI to generate recommendations (depends on transportCosts)
       const recommendations = await this.generateRecommendations(request, route, transportCosts);
 
       return {
